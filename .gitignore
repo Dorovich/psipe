@@ -1,0 +1,25 @@
+# top level gitignore
+
+# macOs related
+.DS_Store
+
+# editor related
+*.swp
+\#*\#
+*~
+
+# qcow2 drivers
+*.qcow2
+
+# configurations
+*.conf
+
+# logs
+*.log
+
+# lsp
+compile_commands.json
+
+# build folders
+build/
+/src/hw/plink_hw.h
