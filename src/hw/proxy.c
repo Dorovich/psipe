@@ -7,6 +7,21 @@
 #include "proxy.h"
 
 /* ============================================================================
+ * Private
+ * ============================================================================
+ */
+
+void pnvl_proxy_init_server(PNVLDevice *dev)
+{
+	return;
+}
+
+void pnvl_proxy_init_client(PNVLDevice *dev)
+{
+	return;
+}
+
+/* ============================================================================
  * Public
  * ============================================================================
  */
@@ -95,4 +110,41 @@ int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buffer, size_t len)
 		return PNVL_FAILURE;
 
 	return PNVL_SUCCESS;
+}
+
+void pnvl_proxy_reset(PNVLDevice *dev)
+{
+	return;
+}
+
+void pnvl_proxy_init(PNVLDevice *dev, Error **errp)
+{
+	struct hostent *h;
+
+	h = gethostbyname(PNVL_PROXY_HOST);
+	if (!h) {
+		herror("gethostbyname");
+		return;
+	}
+
+	dev->proxy.sockd = socket(AF_INET, SOCK_STREAM, 0);
+	if (dev->proxy.sockd < 0) {
+		perror("socket");
+		return;
+	}
+
+	bzero(&dev->proxy.addr, sizeof(dev->proxy.addr));
+	dev->proxy.add.sin_family = AF_INET;
+	dev->proxy.add.sin_port = htons(dev->proxy.port);
+	dev->proxy.add.sin_addr = *(in_addr_t *)h->h_addr_list[0];
+
+	if (dev->proxy.server_mode)
+		pnvl_proxy_init_server(dev);
+	else
+		pnvl_proxy_init_client(dev);
+}
+
+void pnvl_proxy_fini(PNVLDevice *dev)
+{
+	return;
 }

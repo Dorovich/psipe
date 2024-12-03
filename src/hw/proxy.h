@@ -43,3 +43,7 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req);
 
 int pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buffer, size_t *len);
 int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buffer, size_t len);
+
+void pnvl_proxy_reset(PNVLDevice *dev);
+void pnvl_proxy_init(PNVLDevice *dev, Error **errp);
+void pnvl_proxy_fini(PNVLDevice *dev);

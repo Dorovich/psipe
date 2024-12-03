@@ -49,3 +49,7 @@ int pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t src, size_t *len);
 int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t dst, size_t ofs);
 
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle);
+
+void pnvl_dma_reset(PNVLDevice *dev);
+void pnvl_dma_init(PNVLDevice *dev, Error **errp);
+void pnvl_dma_fini(PNVLDevice *dev);
