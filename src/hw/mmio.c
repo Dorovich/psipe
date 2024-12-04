@@ -32,8 +32,20 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, size_t size)
 	if (!pnvl_mmio_valid_access(addr, size))
 		return val;
 
-	/* switch(addr) { */
-	/* } */
+	switch(addr) {
+	case PNVL_HW_BAR0_DMA_CFG_LEN:
+		val = dev->dma.config.len;
+		break;
+	case PNVL_HW_BAR0_DMA_CFG_PGS:
+		val = dev->dma.config.npages;
+		break;
+	case PNVL_HW_BAR0_DMA_CFG_OFS:
+		val = dev->dma.config.offset;
+		break;
+	case PNVL_HW_BAR0_DMA_CFG_MODE:
+		val = dev->dma.config.mode;
+		break;
+	}
 
 	return val;
 }
@@ -46,8 +58,39 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 	if (!pnvl_mmio_valid_access(addr, size))
 		return;
 
-	/* switch(addr) { */
-	/* } */
+	switch(addr) {
+	case PNVL_HW_BAR0_IRQ_0_RAISE:
+		pnvl_irq_raise(dev, 0);
+		break;
+	case PNVL_HW_BAR0_IRQ_0_LOWER:
+		pnvl_irq_lower(dev, 0);
+		break;
+	case PNVL_HW_BAR0_DMA_CFG_LEN:
+		if (pnvl_dma_is_idle(dev))
+			dev->dma.config.len = val;
+		break;
+	case PNVL_HW_BAR0_DMA_CFG_PGS:
+		if (pnvl_dma_is_idle(dev))
+			dev->dma.config.npages = val;
+		break;
+	case PNVL_HW_BAR0_DMA_CFG_OFS:
+		if (pnvl_dma_is_idle(dev))
+			dev->dma.config.offset = val;
+		break;
+	case PNVL_HW_BAR0_DMA_CFG_MODE:
+		if (pnvl_dma_is_idle(dev))
+			dev->dma.config.mode = val;
+		break;
+	case PNVL_HW_BAR0_DMA_DOORBELL_RING:
+		pnvl_transfer_pages(dev);
+		break;
+	default: /* DMA handles area */
+		if (pnvl_dma_is_idle(dev)) {
+			int pos = (addr-PNVL_HW_BAR0_HANDLES)/sizeof(addr);
+			dev->dma.handle[pos] = val;
+		}
+		break;
+	}
 }
 
 /* ============================================================================

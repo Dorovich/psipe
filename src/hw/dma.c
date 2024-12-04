@@ -81,6 +81,11 @@ void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
 	dma->handles[dma->config.npages++] = handle;
 }
 
+bool pnvl_dma_is_idle(PNVLDevice *dev)
+{
+	return (qatomic_read(&dev->dma.status) == DMA_IDLE);
+}
+
 void pnvl_dma_reset(PNVLDevice *dev)
 {
 	DMAEngine *dma = &dev->dma;
