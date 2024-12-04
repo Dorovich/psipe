@@ -20,12 +20,12 @@ typedef dma_addr_t dma_size_t;
 typedef uint64_t dma_mask_t;
 
 typedef struct DMAConfig {
-	size_t npages;
-	size_t offset;
+	dma_size_t npages;
+	dma_size_t offset;
 	dma_size_t len;
-	dma_addr_t handles[PNVL_HW_BAR0_DMA_WORK_AREA_SIZE];
 	dma_mode_t mode;
 	dma_mask_t mask;
+	dma_addr_t handles[PNVL_HW_BAR0_DMA_WORK_AREA_SIZE];
 } DMAConfig;
 
 typedef enum DMAStatus {
