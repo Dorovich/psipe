@@ -9,17 +9,11 @@
 #include <linux/dma-mapping.h>
 
 static void pnvl_dma_struct_init(struct pnvl_dma *dma, size_t ofs, size_t len,
-				enum dma_data_direction dir)
+	enum dma_data_direction dir)
 {
 	dma->offset = ofs;
 	dma->len = len;
 	dma->direction = dir;
-}
-
-void pnvl_dma_set_npages(struct pnvl_dev *pnvl_dev)
-{
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	iowrite32((u32)pnvl_dev->dma.npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 }
 
 int pnvl_dma_setup_handles(struct pnvl_dev *pnvl_dev)
@@ -56,31 +50,14 @@ int pnvl_dma_setup_handles(struct pnvl_dev *pnvl_dev)
 	return 0;
 }
 
-int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, int mode)
+void pnvl_dma_setup_conclude(struct pnvl_dev *pnvl_dev)
 {
-	struct pci_dev *pdev;
 	struct pnvl_dma *dma;
 	void __iomem *mmio;
-	int ret;
 	size_t ofs;
 
 	mmio = pnvl_dev->bar.mmio;
 	dma = &pnvl_dev->dma;
-
-	switch(mode) {
-	case PNVL_MODE_WORK:
-		dma->direction = DMA_TO_DEVICE;
-		break;
-	case PNVL_MODE_WATCH:
-		dma->direction = DMA_FROM_DEVICE;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	ret = pnvl_dma_setup_handles(pnvl_dev);
-	if (ret < 0)
-		return ret;
 
 	iowrite32(dma->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
 	iowrite32(dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
@@ -94,6 +71,28 @@ int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, int mode)
 	}
 
 	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
+}
+
+int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, int mode)
+{
+	int ret;
+
+	switch(mode) {
+	case PNVL_MODE_WORK:
+		pnvl_dev->dma.direction = DMA_TO_DEVICE;
+		break;
+	case PNVL_MODE_WATCH:
+		pnvl_dev->dma.direction = DMA_FROM_DEVICE;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ret = pnvl_dma_setup_handles(pnvl_dev);
+	if (ret < 0)
+		return ret;
+
+	pnvl_dma_setup_conclude(pnvl_dev);
 
 	return 0;
 }
