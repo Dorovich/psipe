@@ -11,6 +11,9 @@
 #include <linux/pci.h>
 #include <linux/wait.h>
 
+#define PNVL_MODE_WORK 0x01
+#define PNVL_MODE_WAIT 0x02
+
 /* forward declaration */
 struct pnvl_dev;
 

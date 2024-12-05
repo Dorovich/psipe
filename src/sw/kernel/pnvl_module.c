@@ -59,7 +59,7 @@ int pnvl_setup_pages(struct pnvl_dev *pnvl_dev, struct pnvl_tx *tx)
 
 	npages_pinned = 0;
 	first_page = (tx->addr & PAGE_MASK) >> PAGE_SHIFT;
-	last_page ((tx->addr + tx->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
+	last_page = ((tx->addr + tx->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	npages = last_page - first_page + 1;
 	npages_pinned = pin_user_pages_fast(tx->addr, npages,
 					FOLL_LONGTERM, pnvl_dev->dma.pages);
@@ -302,7 +302,7 @@ static void pnvl_remove(struct pci_dev *pdev)
 
 static struct pci_driver pnvl_pci_driver = {
 	.name = "pnvl",
-	.id_table = pnvl_id_tbl,
+	.id_table = pnvl_id_table,
 	.probe = pnvl_probe,
 	.remove = pnvl_remove,
 };
