@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "hw/pnvl_hw.h"
 #include <linux/atomic.h>
 #include <linux/cdev.h>
 #include <linux/pci.h>
@@ -43,6 +44,7 @@ struct pnvl_dev {
 	struct pnvl_bar bar;
 	struct pnvl_irq irq;
 	struct pnvl_dma dma;
+	struct pnvl_data data;
 	dev_t minor;
 	dev_t major;
 	struct cdev cdev;

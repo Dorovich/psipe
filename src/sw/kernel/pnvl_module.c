@@ -40,28 +40,28 @@ static int pnvl_open(struct inode *inode, struct file *fp)
 	return 0;
 }
 
-int pnvl_check_tx_len(struct pnvl_dev *pnvl_dev, size_t len)
+int pnvl_check_size_avail(struct pnvl_dev *pnvl_dev)
 {
-	u32 len_avail;
-	void __iomem *mmio;
+	size_t len_avail;
+	void __iomem *mmio = pnvl_dev->bar.mmio;
 
-	mmio = pnvl_dev->bar.mmio;
-	len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_NPAGES);
+	len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 
-	if (len > len_avail)
+	if (dev->data.out_len > len_avail)
 		return -ENOSPC;
 	return 0;
 }
 
-int pnvl_setup_pages(struct pnvl_dev *pnvl_dev, struct pnvl_tx *tx)
+int pnvl_setup_pages(struct pnvl_dev *pnvl_dev)
 {
 	int first_page, last_page, npages, npages_pinned;
+	struct pnvl_data *data = &pnvl_dev->data;
 
 	npages_pinned = 0;
-	first_page = (tx->addr & PAGE_MASK) >> PAGE_SHIFT;
-	last_page = ((tx->addr + tx->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
+	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
+	last_page = ((data->addr + tx->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	npages = last_page - first_page + 1;
-	npages_pinned = pin_user_pages_fast(tx->addr, npages,
+	npages_pinned = pin_user_pages_fast(data->addr, npages,
 					FOLL_LONGTERM, pnvl_dev->dma.pages);
 
 	pnvl_dev->dma.offset = tx->addr & ~PAGE_MASK;
@@ -73,31 +73,47 @@ int pnvl_setup_pages(struct pnvl_dev *pnvl_dev, struct pnvl_tx *tx)
 
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
-	struct pnvl_dev *pnvl_dev;
-	struct pnvl_tx tx, __user *utx;
-
-	pnvl_dev = fp->private_data;
-	utx = arg;
+	struct pnvl_dev *pnvl_dev = fp->private_data;
+	struct pnvl_data __user *udata = arg;
 
 	switch(cmd) {
 	case PNVL_IOCTL_WORK:
-		copy_from_user(&tx, utx, sizeof(tx));
-		if (pnvl_check_size(tx.len) < 0)
+		copy_from_user(&dev->data, udata, sizeof(dev->data));
+		if (pnvl_check_size_avail(pnvl_dev) < 0)
 			return -ENOSPC;
-		if (!pnvl_setup_pages(pnvl_dev, &tx))
-			return pnvl_dma_setup(pnvl_dev, PNVL_MODE_WORK);
-		break;
+		if (!(pnvl_setup_pages(pnvl_dev)))
+			return pnvl_dma_execute(pnvl_dev);
 	case PNVL_IOCTL_WAIT:
 		pnvl_dma_wait(pnvl_dev);
 		break;
-	case PNVL_IOCTL_WATCH:
-		copy_from_user(&tx, utx, sizeof(tx));
-		if (!pnvl_setup_pages(pnvl_dev, &tx))
-			return pnvl_dma_setup(pnvl_dev, PNVL_MODE_WATCH);
-		break;
 	default:
-		return -ENOTTY;
+		return -EINVAL;
 	}
+
+	/* struct pnvl_data tx, __user *utx; */
+
+	/* pnvl_dev = fp->private_data; */
+	/* utx = arg; */
+
+	/* switch(cmd) { */
+	/* case PNVL_IOCTL_WORK: */
+	/* 	copy_from_user(&tx, utx, sizeof(tx)); */
+	/* 	if (pnvl_check_size(tx.len) < 0) */
+	/* 		return -ENOSPC; */
+	/* 	if (!pnvl_setup_pages(pnvl_dev, &tx)) */
+	/* 		return pnvl_dma_setup(pnvl_dev, PNVL_MODE_WORK); */
+	/* 	break; */
+	/* case PNVL_IOCTL_WAIT: */
+	/* 	pnvl_dma_wait(pnvl_dev); */
+	/* 	break; */
+	/* case PNVL_IOCTL_WATCH: */
+	/* 	copy_from_user(&tx, utx, sizeof(tx)); */
+	/* 	if (!pnvl_setup_pages(pnvl_dev, &tx)) */
+	/* 		return pnvl_dma_setup(pnvl_dev, PNVL_MODE_WATCH); */
+	/* 	break; */
+	/* default: */
+	/* 	return -ENOTTY; */
+	/* } */
 
 	return 0;
 }
@@ -153,7 +169,6 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev_t dev_num;
 	struct device *dev;
 
-	/* Allocate the struct that will hold our device state/context */
 	pnvl_dev = pnvl_alloc_dev();
 	if (pnvl_dev == NULL) {
 		err = -ENOMEM;
@@ -161,10 +176,9 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_pnvl_alloc;
 	}
 
-	/* Enable the PCI device. This will :
-	 *  - wake up the device if it was in suspended state,
-	 *  - allocate I/O and memory regions of the device (if BIOS did not),
-	 *  - allocate an IRQ (if BIOS did not).
+	/* - Wake up the device if it was in suspended state,
+	 * - Allocate I/O and memory regions of the device (if BIOS did not),
+	 * - Allocate an IRQ (if BIOS did not).
 	 */
 	err = pci_enable_device(pdev);
 	if (err) {
@@ -210,14 +224,11 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_alloc_chrdev;
 	}
 
-	/* save minor and major */
 	pnvl_dev->minor = MINOR(dev_num);
 	pnvl_dev->major = MAJOR(dev_num);
 
-	/* connect cdev with file operations */
 	cdev_init(&pnvl_dev->cdev, &pnvl_fops);
 
-	/* add major/min range to cdev */
 	err = cdev_add(&pnvl_dev->cdev, MKDEV(pnvl_dev->major,
 				pnvl_dev->minor), PNVL_HW_BAR_CNT);
 	if (err) {
@@ -225,7 +236,6 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_cdev_add;
 	}
 
-	/* create /dev/ node via udev */
 	dev = device_create(pnvl_class, &pdev->dev,
 			MKDEV(pnvl_dev->major, pnvl_dev->minor),
 			pnvl_dev, "d%xb%xd%xf%x_bar%u",
@@ -238,7 +248,6 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_device_create;
 	}
 
-	/* enable IRQs */
 	err = pnvl_irq_enable(pnvl_dev);
 	if (err) {
 		dev_err(&pdev->dev, "pnvl_irq_enable failed\n");
@@ -285,6 +294,7 @@ err_pnvl_alloc:
 static void pnvl_remove(struct pci_dev *pdev)
 {
 	struct pnvl_dev *pnvl_dev = pci_get_drvdata(pdev);
+
 	device_destroy(pnvl_class, MKDEV(pnvl_dev->major,
 				pnvl_dev->minor));
 	cdev_del(&pnvl_dev->cdev);
@@ -345,4 +355,4 @@ err_pci:
 }
 
 module_init(pnvl_module_init);
-MODULE_EXIT(PNVL_MODULE_EXIT);
+module_exit(pnvl_module_exit);
