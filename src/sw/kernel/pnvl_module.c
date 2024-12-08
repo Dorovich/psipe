@@ -40,80 +40,31 @@ static int pnvl_open(struct inode *inode, struct file *fp)
 	return 0;
 }
 
-int pnvl_check_size_avail(struct pnvl_dev *pnvl_dev)
-{
-	size_t len_avail;
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-
-	len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
-
-	if (dev->data.out_len > len_avail)
-		return -ENOSPC;
-	return 0;
-}
-
-int pnvl_setup_pages(struct pnvl_dev *pnvl_dev)
-{
-	int first_page, last_page, npages, npages_pinned;
-	struct pnvl_data *data = &pnvl_dev->data;
-
-	npages_pinned = 0;
-	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
-	last_page = ((data->addr + tx->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
-	npages = last_page - first_page + 1;
-	npages_pinned = pin_user_pages_fast(data->addr, npages,
-					FOLL_LONGTERM, pnvl_dev->dma.pages);
-
-	pnvl_dev->dma.offset = tx->addr & ~PAGE_MASK;
-	pnvl_dev->dma.npages = npages;
-	pnvl_dev->dma.len = tx->len;
-
-	return npages_pinned - npages;
-}
-
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
 	struct pnvl_data __user *udata = arg;
+	int ret;
+
+	if (!udata)
+		return -EINVAL;
+	copy_from_user(&dev->data, udata, sizeof(dev->data));
 
 	switch(cmd) {
 	case PNVL_IOCTL_WORK:
-		copy_from_user(&dev->data, udata, sizeof(dev->data));
-		if (pnvl_check_size_avail(pnvl_dev) < 0)
-			return -ENOSPC;
-		if (!(pnvl_setup_pages(pnvl_dev)))
-			return pnvl_dma_execute(pnvl_dev);
+		ret = pnvl_dma_setup(pnvl_dev, DMA_TO_DEVICE);
+		if (ret < 0)
+			return ret;
+		break;
 	case PNVL_IOCTL_WAIT:
+		ret = pnvl_dma_setup(pnvl_dev, DMA_FROM_DEVICE);
+		if (ret < 0)
+			return ret;
 		pnvl_dma_wait(pnvl_dev);
 		break;
 	default:
-		return -EINVAL;
+		return -ENOTTY;
 	}
-
-	/* struct pnvl_data tx, __user *utx; */
-
-	/* pnvl_dev = fp->private_data; */
-	/* utx = arg; */
-
-	/* switch(cmd) { */
-	/* case PNVL_IOCTL_WORK: */
-	/* 	copy_from_user(&tx, utx, sizeof(tx)); */
-	/* 	if (pnvl_check_size(tx.len) < 0) */
-	/* 		return -ENOSPC; */
-	/* 	if (!pnvl_setup_pages(pnvl_dev, &tx)) */
-	/* 		return pnvl_dma_setup(pnvl_dev, PNVL_MODE_WORK); */
-	/* 	break; */
-	/* case PNVL_IOCTL_WAIT: */
-	/* 	pnvl_dma_wait(pnvl_dev); */
-	/* 	break; */
-	/* case PNVL_IOCTL_WATCH: */
-	/* 	copy_from_user(&tx, utx, sizeof(tx)); */
-	/* 	if (!pnvl_setup_pages(pnvl_dev, &tx)) */
-	/* 		return pnvl_dma_setup(pnvl_dev, PNVL_MODE_WATCH); */
-	/* 	break; */
-	/* default: */
-	/* 	return -ENOTTY; */
-	/* } */
 
 	return 0;
 }

@@ -8,6 +8,32 @@
 #include "pnvl_module.h"
 #include <linux/dma-mapping.h>
 
+bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
+{
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
+	return dev->data.len > len_avail;
+}
+
+int pnvl_dma_setup_pages(struct pnvl_dev *pnvl_dev)
+{
+	int first_page, last_page, npages, npages_pinned;
+	struct pnvl_data *data = &pnvl_dev->data;
+
+	npages_pinned = 0;
+	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
+	last_page = ((data->addr + data->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
+	npages = last_page - first_page + 1;
+	npages_pinned = pin_user_pages_fast(data->addr, npages,
+					FOLL_LONGTERM, pnvl_dev->dma.pages);
+
+	pnvl_dev->dma.offset = data->addr & ~PAGE_MASK;
+	pnvl_dev->dma.npages = npages;
+	pnvl_dev->dma.len = data->len;
+
+	return npages_pinned - npages;
+}
+
 int pnvl_dma_setup_handles(struct pnvl_dev *pnvl_dev)
 {
 	struct pci_dev *pdev = &pnvl_dev->pdev;
@@ -49,7 +75,7 @@ err_dma_map:
 	return err;
 }
 
-void pnvl_dma_setup_conclude(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_setup_consolidate(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	void __iomem *mmio = pnvl_dev->bar.mmio;
@@ -68,28 +94,24 @@ void pnvl_dma_setup_conclude(struct pnvl_dev *pnvl_dev)
 	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
 }
 
-int pnvl_dma_execute(struct pnvl_dev *pnvl_dev, int mode)
+int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, enum dma_data_direction dir)
 {
 	int ret;
 
-	/* switch(mode) { */
-	/* case PNVL_MODE_WORK: */
-	/* 	pnvl_dev->dma.direction = DMA_TO_DEVICE; */
-	/* 	break; */
-	/* case PNVL_MODE_WATCH: */
-	/* 	pnvl_dev->dma.direction = DMA_FROM_DEVICE; */
-	/* 	break; */
-	/* default: */
-	/* 	return -EINVAL; */
-	/* } */
+	if (dir == DMA_TO_DEVICE && !pnvl_dma_check_size_avail(pnvl_dev))
+		return -ENOSPC;
 
-	pnvl_dev->dma.direction = DMA_TO_DEVICE;
+	pnvl_dev->dma.direction = dir;
+
+	ret = pnvl_dma_setup_pages(pnvl_dev);
+	if (ret < 0)
+		return ret;
 
 	ret = pnvl_dma_setup_handles(pnvl_dev);
 	if (ret < 0)
 		return ret;
 
-	pnvl_dma_setup_conclude(pnvl_dev);
+	pnvl_dma_setup_consolidate(pnvl_dev);
 
 	return 0;
 }
