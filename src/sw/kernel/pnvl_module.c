@@ -40,28 +40,45 @@ static int pnvl_open(struct inode *inode, struct file *fp)
 	return 0;
 }
 
+static int pnvl_ioctl_work(struct pnvl_dev *pnvl_dev)
+{
+	int ret = 0;
+
+	ret = pnvl_dma_setup_out(pnvl_dev);
+	if (ret < 0)
+		return ret;
+	pnvl_dma_doorbell_ring(pnvl_dev);
+
+	return ret;
+}
+
+static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
+{
+	int ret = 0;
+
+	ret = pnvl_dma_setup_in(pnvl_dev);
+	if (ret < 0)
+		return ret;
+	pnvl_dma_wait(pnvl_dev);
+
+	return ret;
+}
+
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
 	struct pnvl_data __user *udata = arg;
 	int ret;
 
-	if (!udata)
+	if (!udata && !pnvl_dev->data.addr)
 		return -EINVAL;
 	copy_from_user(&dev->data, udata, sizeof(dev->data));
 
 	switch(cmd) {
 	case PNVL_IOCTL_WORK:
-		ret = pnvl_dma_setup(pnvl_dev, DMA_TO_DEVICE);
-		if (ret < 0)
-			return ret;
-		break;
+		return pnvl_ioctl_work(pnvl_dev);
 	case PNVL_IOCTL_WAIT:
-		ret = pnvl_dma_setup(pnvl_dev, DMA_FROM_DEVICE);
-		if (ret < 0)
-			return ret;
-		pnvl_dma_wait(pnvl_dev);
-		break;
+		return pnvl_ioctl_wait(pnvl_dev);
 	default:
 		return -ENOTTY;
 	}
@@ -204,6 +221,8 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		dev_err(&pdev->dev, "pnvl_irq_enable failed\n");
 		goto err_irq_enable;
 	}
+
+	bzero(&pnvl_dev->data, sizeof(pnvl_dev->data));
 
 	dev_info(&pdev->dev, "pnvl probe - success\n");
 

@@ -90,16 +90,29 @@ void pnvl_dma_setup_consolidate(struct pnvl_dev *pnvl_dev)
 			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
 		ofs += sizeof(u32);
 	}
+}
 
+void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
+{
+	void __iomem *mmio = pnvl_dev->bar.mmio;
 	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
+}
+
+int pnvl_dma_setup_out(struct pnvl_dev *pnvl_dev)
+{
+	return pnvl_dma_setup(pnvl_dev, DMA_TO_DEVICE);
+}
+
+int pnvl_dma_setup_in(struct pnvl_dev *pnvl_dev)
+{
+	if (!pnvl_dma_check_size_avail(pnvl_dev))
+		return -ENOSPC;
+	return pnvl_dma_setup(pnvl_dev, DMA_FROM_DEVICE);
 }
 
 int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, enum dma_data_direction dir)
 {
 	int ret;
-
-	if (dir == DMA_TO_DEVICE && !pnvl_dma_check_size_avail(pnvl_dev))
-		return -ENOSPC;
 
 	pnvl_dev->dma.direction = dir;
 

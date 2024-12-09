@@ -51,13 +51,3 @@ struct pnvl_dev {
 	atomic_t wq_flag;
 	wait_queue_head_t wq;
 };
-
-/* ============================================================================
- * Public
- * ============================================================================
- */
-
-int pnvl_dma_work(struct pnvl_dev *pnvl_dev);
-int pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
-
-int pnvl_irq_enable(struct pnvl_dev *pnvl_dev);
