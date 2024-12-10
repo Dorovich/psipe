@@ -42,3 +42,4 @@ typedef struct PNVLDevice {
  */
 
 void pnvl_transfer_pages(PNVLDevice *dev);
+void pnvl_receive_pages(PNVLDevice *dev);

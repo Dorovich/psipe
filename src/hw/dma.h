@@ -15,7 +15,6 @@
 /* forward declaration */
 typedef struct PNVLDevice PNVLDevice;
 
-typedef uint64_t dma_mode_t;
 typedef dma_addr_t dma_size_t;
 typedef uint64_t dma_mask_t;
 
@@ -23,7 +22,7 @@ typedef struct DMAConfig {
 	dma_size_t npages;
 	dma_size_t offset;
 	dma_size_t len;
-	dma_mode_t mode;
+	dma_size_t len_avail;
 	dma_mask_t mask;
 	dma_addr_t handles[PNVL_HW_BAR0_DMA_WORK_AREA_SIZE];
 } DMAConfig;
@@ -45,11 +44,10 @@ typedef struct DMAEngine {
  * ============================================================================
  */
 
-int pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t src, size_t *len);
-int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t dst, size_t ofs);
+size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr);
+int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t addr, size_t len);
 
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle);
-
 bool pnvl_dma_is_idle(PNVLDevice *dev);
 
 void pnvl_dma_reset(PNVLDevice *dev);

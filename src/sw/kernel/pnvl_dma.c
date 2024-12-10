@@ -11,7 +11,7 @@
 bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
-	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
+	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 	return dev->data.len > len_avail;
 }
 
@@ -100,13 +100,13 @@ void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
 
 int pnvl_dma_setup_out(struct pnvl_dev *pnvl_dev)
 {
+	if (!pnvl_dma_check_size_avail(pnvl_dev))
+		return -ENOSPC;
 	return pnvl_dma_setup(pnvl_dev, DMA_TO_DEVICE);
 }
 
 int pnvl_dma_setup_in(struct pnvl_dev *pnvl_dev)
 {
-	if (!pnvl_dma_check_size_avail(pnvl_dev))
-		return -ENOSPC;
 	return pnvl_dma_setup(pnvl_dev, DMA_FROM_DEVICE);
 }
 

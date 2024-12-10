@@ -77,9 +77,11 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 		if (pnvl_dma_is_idle(dev))
 			dev->dma.config.offset = val;
 		break;
-	case PNVL_HW_BAR0_DMA_CFG_MODE:
-		if (pnvl_dma_is_idle(dev))
-			dev->dma.config.mode = val;
+	case PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL:
+		if (pnvl_dma_is_idle(dev)) {
+			dev->dma.config.len_avail = val;
+			pnvl_proxy_issue_req(dev, PNVL_REQ_ALN);
+		}
 		break;
 	case PNVL_HW_BAR0_DMA_DOORBELL_RING:
 		pnvl_transfer_pages(dev);

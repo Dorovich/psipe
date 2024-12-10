@@ -13,12 +13,53 @@
 
 void pnvl_proxy_init_server(PNVLDevice *dev)
 {
-	return;
+	int ret;
+	PNVLProxy *proxy = &dev->proxy;
+	socklen_t len; /* not used again */
+
+	ret = bind(proxy->server.sockd, (struct sockaddr *)&proxy->server.addr,
+		sizeof(proxy->server.addr));
+	if (ret < 0) {
+		perror("bind");
+		return;
+	}
+
+	ret = listen(proxy->server.sockd, PNVL_PROXY_MAXQ);
+	if (ret < 0) {
+		perror("listen");
+		return;
+	}
+
+	len = sizeof(proxy->client.addr);
+	con = accept(proxy->client.sockd,
+		(struct sockaddr *)&proxy->client.addr, &len);
+	if (ret < 0) {
+		perror("accept");
+		return;
+	}
+
+	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
+
+	close(proxy->client.sockd);
+	close(proxy->server.sockd);
 }
 
 void pnvl_proxy_init_client(PNVLDevice *dev)
 {
-	return;
+	int ret;
+	PNVLProxy *proxy = &dev->proxy;
+
+	ret = connect(proxy->server.sockd,
+		(struct sockaddr *)&proxy->server.addr, sizeof(proxy->addr));
+	if (ret < 0) {
+		perror("connect");
+		return;
+	}
+
+	ProxyRequest req = pnvl_proxy_wait_req(dev);
+	pnvl_proxy_handle_req(dev, req);
+
+	close(proxy->server.sockd);
 }
 
 /* ============================================================================
@@ -29,11 +70,14 @@ void pnvl_proxy_init_client(PNVLDevice *dev)
 ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 {
 	int ret, con;
-	ProxyRequest req;
+	ProxyRequest req = PNVL_REQ_NONE;
 	fd_set cons;
 
-	con = dev->proxy.sockd;
-	req = PNVL_REQ_NONE;
+	if (dev->proxy.server_mode)
+		con = dev->proxy.client.sockd;
+	else
+		con = dev->proxy.server.sockd;
+
 	FD_ZERO(&cons);
 	FD_SET(con, &cons);
 	ret = select(con+1, &cons, NULL, NULL, NULL);
@@ -45,13 +89,18 @@ ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 
 int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req)
 {
-	int ret;
+	int ret, con;
 
-	ret = send(dev->proxy.sockd, &req, sizeof(req), 0);
+	if (dev->proxy.server_mode)
+		con = dev->proxy.client.sockd;
+	else
+		con = dev->proxy.server.sockd;
+
+	ret = send(con, &req, sizeof(req), 0);
 	if (ret < 0)
 		return PNVL_FAILURE;
 
-	return PNVL_SUCCESS
+	return PNVL_SUCCESS;
 }
 
 int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
@@ -62,7 +111,9 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 	case PNVL_REQ_RST:
 		qmp_system_reset(NULL); /* see qemu/ui/gtk.c L1313 */
 		break;
-	case PNVL_REQ_NIL:
+	case PNVL_REQ_ALN:
+		return recv(dev->proxy.sockd, &dev->dma.config.len_avail,
+			sizeof(dev->dma.config.len_avail), 0);
 	case PNVL_REQ_ACK:
 		break;
 	default:
@@ -75,37 +126,44 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 /*
  * Receive page: buffer <-- socket
  */
-int pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buffer, size_t *len)
+size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 {
 	int ret, con;
+	size_t len;
 
-	con = dev->proxy.sockd;
+	if (dev->proxy.server_mode)
+		con = dev->proxy.client.sockd;
+	else
+		con = dev->proxy.server.sockd;
 
-	ret = recv(con, len, sizeof(*len), 0);
+	ret = recv(con, &len, sizeof(len), 0);
 	if (ret < 0)
 		return PNVL_FAILURE;
 
-	ret = recv(con, buffer, *len, 0);
+	ret = recv(con, buff, len, 0);
 	if (ret < 0)
 		return PNVL_FAILURE;
 
-	return PNVL_SUCCESS;
+	return len;
 }
 
 /*
  * Transmit page: buffer --> socket
  */
-int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buffer, size_t len)
+int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len)
 {
 	int ret, con;
 
-	con = dev->proxy.sockd;
+	if (dev->proxy.server_mode)
+		con = dev->proxy.client.sockd;
+	else
+		con = dev->proxy.server.sockd;
 
 	ret = send(con, &len, sizeof(len), 0);
 	if (ret < 0)
 		return PNVL_FAILURE;
 
-	ret = send(con, buffer, len, 0);
+	ret = send(con, buff, len, 0);
 	if (ret < 0)
 		return PNVL_FAILURE;
 
@@ -119,7 +177,8 @@ void pnvl_proxy_reset(PNVLDevice *dev)
 
 void pnvl_proxy_init(PNVLDevice *dev, Error **errp)
 {
-	struct hostent *h;
+	PNVLProxy *proxy = &dev->proxy;
+	struct hostent *h; /* not used again */
 
 	h = gethostbyname(PNVL_PROXY_HOST);
 	if (!h) {
@@ -127,18 +186,18 @@ void pnvl_proxy_init(PNVLDevice *dev, Error **errp)
 		return;
 	}
 
-	dev->proxy.sockd = socket(AF_INET, SOCK_STREAM, 0);
-	if (dev->proxy.sockd < 0) {
+	proxy->server.sockd = socket(AF_INET, SOCK_STREAM, 0);
+	if (proxy->server.sockd < 0) {
 		perror("socket");
 		return;
 	}
 
-	bzero(&dev->proxy.addr, sizeof(dev->proxy.addr));
-	dev->proxy.add.sin_family = AF_INET;
-	dev->proxy.add.sin_port = htons(dev->proxy.port);
-	dev->proxy.add.sin_addr = *(in_addr_t *)h->h_addr_list[0];
+	bzero(&proxy->server.addr, sizeof(proxy->server.addr));
+	proxy->server.addr.sin_family = AF_INET;
+	proxy->server.addr.sin_port = htons(proxy->port);
+	proxy->server.addr.sin_addr = *(in_addr_t *)h->h_addr_list[0];
 
-	if (dev->proxy.server_mode)
+	if (proxy->server_mode)
 		pnvl_proxy_init_server(dev);
 	else
 		pnvl_proxy_init_client(dev);

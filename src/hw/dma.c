@@ -38,7 +38,7 @@ static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
 /*
  * Receive page: DMA buffer <-- RAM
  */
-int pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t src, size_t *len)
+size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr)
 {
 	int err;
 	size_t len, pgsize;
@@ -46,29 +46,30 @@ int pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t src, size_t *len)
 
 	pgsize = qemu_target_page_size();
 	mask = pgsize-1;
-	src = pnvl_dma_mask(src);
+	addr = pnvl_dma_mask(addr);
+	len = pgsize;
 
-	if ((src & mask) + len > pgsize)
+	if ((addr & mask) + len > pgsize)
 		len = pgsize
 
-	err = pci_dma_read(&dev->pci_dev, src, dev->dma.buff, len);
+	err = pci_dma_read(&dev->pci_dev, addr, dev->dma.buff, len);
 	if (err)
 		return PNVL_FAILURE;
 
-	return PNVL_SUCCESS;
+	return len;
 }
 
 /*
  * Transmit page: DMA buffer --> RAM
  */
-int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t dst, size_t ofs)
+int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t addr, size_t len)
 {
 	int err;
 	size_t pgsize;
 
 	pgsize = qemu_target_page_size();
-	dst = pnvl_dma_mask(dst);
-	err = pci_dma_write(&dev->pci_dev, dst, dev->dma.buff, len);
+	addr = pnvl_dma_mask(addr);
+	err = pci_dma_write(&dev->pci_dev, addr, dev->dma.buff, len);
 	if (err)
 		return PNVL_FAILURE;
 
@@ -84,6 +85,11 @@ void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
 bool pnvl_dma_is_idle(PNVLDevice *dev)
 {
 	return (qatomic_read(&dev->dma.status) == DMA_IDLE);
+}
+
+dma_addr_t pnvl_dma_next_page(PNVLDevice *dev/*, ? */)
+{
+	/* ? */
 }
 
 void pnvl_dma_reset(PNVLDevice *dev)

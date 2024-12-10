@@ -110,5 +110,36 @@ type_init(pnvl_register_types)
 
 void pnvl_transfer_pages(PNVLDevice *dev)
 {
-	/* TODO */
+	dma_addr_t addr;
+	size_t len_total = dev->dma.config.len;
+	size_t len;
+
+	for (int i = 0; i < dev->dma.config.npages; ++i) {
+		addr = dev->dma.config.handles[i];
+		len = pnvl_dma_rx_page(dev, addr);
+		pnvl_proxy_tx_page(dev, dev->dma.buffer, len);
+		len_total -= len;
+	}
+}
+
+void pnvl_receive_pages(PNVLDevice *dev)
+{
+	dma_addr_t addr;
+	size_t len_total = dev->dma.config.len;
+	size_t len;
+
+	for (int i = 0; i < dev->dma.config.npages; ++i) {
+		addr = dev->dma.config.handles[i];
+		len = pnvl_proxy_rx_page(dev, dev->dma.buffer);
+		pnvl_dma_tx_page(dev, addr, len);
+		len_total -= len;
+	}
+
+	do { /* TODO: Alternative code */
+		addr = pnvl_dma_next_addr(dev);
+		len = pnvl_proxy_rx_page(dev, dev->dma.buffer);
+		pnvl_dma_tx_page(dev, addr, len);
+		len_total -= len;
+		if (+ len < qemu_target_page_size())
+	} while (len_total > 0);
 }
