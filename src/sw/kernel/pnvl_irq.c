@@ -15,19 +15,18 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 	dev_dbg(&pnvl_dev->pdev->dev, "irq_handler irq = %d dev = %d\n", irq,
 		pnvl_dev->major);
 
-	for (int i = 0; i < pnvl_dev->dma.npages; ++i) {
-		dma_unmap_page(&pnvl_dev->pdev->dev,
-			pnvl_dev->dma.dma_handles[i],
-			pnvl_dev->dma.len, pnvl_dev->dma.direction);
-		unpin_user_page(pnvl_dev->dma.pages[i]);
-	}
+	pnvl_irq_ack(pnvl_dev);
+	pnvl_dma_dismantle(pnvl_dev);
+	pnvl_dma_wake(pnvl_dev);
 
-	iowrite32(1, pnvl_dev->irq.mmio_ack_irq);
-
-	WRITE_ONCE(&pnvl_dev->wq_flag, 1);
-	wake_up(&pnvl_dev->wq);
+	pnvl_dev->running = false;
 
 	return IRQ_HANDLED;
+}
+
+static void pnvl_irq_ack(struct pnvl_dev *pnvl_dev)
+{
+	iowrite32(1, pnvl_dev->irq.mmio_ack_irq);
 }
 
 static int pnvl_irq_enable_intx(struct pnvl_dev *pnvl_dev)

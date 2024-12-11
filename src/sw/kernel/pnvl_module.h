@@ -50,4 +50,5 @@ struct pnvl_dev {
 	struct cdev cdev;
 	atomic_t wq_flag;
 	wait_queue_head_t wq;
+	bool running;
 };

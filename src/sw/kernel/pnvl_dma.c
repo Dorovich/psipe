@@ -8,14 +8,14 @@
 #include "pnvl_module.h"
 #include <linux/dma-mapping.h>
 
-bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
+static bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
 	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 	return dev->data.len > len_avail;
 }
 
-int pnvl_dma_setup_pages(struct pnvl_dev *pnvl_dev)
+static int pnvl_dma_setup_pages(struct pnvl_dev *pnvl_dev)
 {
 	int first_page, last_page, npages, npages_pinned;
 	struct pnvl_data *data = &pnvl_dev->data;
@@ -34,7 +34,7 @@ int pnvl_dma_setup_pages(struct pnvl_dev *pnvl_dev)
 	return npages_pinned - npages;
 }
 
-int pnvl_dma_setup_handles(struct pnvl_dev *pnvl_dev)
+static int pnvl_dma_setup_handles(struct pnvl_dev *pnvl_dev)
 {
 	struct pci_dev *pdev = &pnvl_dev->pdev;
 	struct pnvl_dma *dma = &pnvl_dev->dma;
@@ -75,7 +75,7 @@ err_dma_map:
 	return err;
 }
 
-void pnvl_dma_setup_consolidate(struct pnvl_dev *pnvl_dev)
+static void pnvl_dma_setup_consolidate(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	void __iomem *mmio = pnvl_dev->bar.mmio;
@@ -98,23 +98,14 @@ void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
 	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
 }
 
-int pnvl_dma_setup_out(struct pnvl_dev *pnvl_dev)
-{
-	if (!pnvl_dma_check_size_avail(pnvl_dev))
-		return -ENOSPC;
-	return pnvl_dma_setup(pnvl_dev, DMA_TO_DEVICE);
-}
-
-int pnvl_dma_setup_in(struct pnvl_dev *pnvl_dev)
-{
-	return pnvl_dma_setup(pnvl_dev, DMA_FROM_DEVICE);
-}
-
 int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, enum dma_data_direction dir)
 {
 	int ret;
 
-	pnvl_dev->dma.direction = dir;
+	if (!pnvl_dma_check_size_avail(pnvl_dev))
+		return -ENOSPC;
+
+	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
 
 	ret = pnvl_dma_setup_pages(pnvl_dev);
 	if (ret < 0)
@@ -129,6 +120,17 @@ int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, enum dma_data_direction dir)
 	return 0;
 }
 
+void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev)
+{
+	struct pnvl_dma *dma = &pnvl_dev->dma;
+
+	for (int i = 0; i < dma->npages; ++i) {
+		dma_unmap_page(&pnvl_dev->pdev->dev, dma->dma_handles[i],
+			dma->len, dma->direction);
+		unpin_user_page(dma->pages[i]);
+	}
+}
+
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev)
 {
 	if (READ_ONCE(&pnvl_dev->wq_flag) == 1)
@@ -136,4 +138,10 @@ void pnvl_dma_wait(struct pnvl_dev *pnvl_dev)
 
 	wait_event(&pnvl_dev->wq, pnvl_dev->wq_flag == 1);
 	WRITE_ONCE(&pnvl_dev->wq_flag, 0);
+}
+
+void pnvl_dma_wake(struct pnvl_dev *pnvl_dev)
+{
+	WRITE_ONCE(&pnvl_dev->wq_flag, 1);
+	wake_up(&pnvl_dev->wq);
 }

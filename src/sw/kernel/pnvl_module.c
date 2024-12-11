@@ -42,26 +42,33 @@ static int pnvl_open(struct inode *inode, struct file *fp)
 
 static int pnvl_ioctl_work(struct pnvl_dev *pnvl_dev)
 {
-	int ret = 0;
+	int ret;
 
-	ret = pnvl_dma_setup_out(pnvl_dev);
+	if (pnvl_dev->running)
+		return -EBUSY;
+
+	ret = pnvl_dma_setup(pnvl_dev);
 	if (ret < 0)
 		return ret;
 	pnvl_dma_doorbell_ring(pnvl_dev);
 
-	return ret;
+	pnvl_dev->running = true;
+
+	return 0;
 }
 
 static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 {
-	int ret = 0;
+	int ret;
 
-	ret = pnvl_dma_setup_in(pnvl_dev);
-	if (ret < 0)
-		return ret;
+	if (!pnvl_dev->running) {
+		ret = pnvl_dma_setup(pnvl_dev);
+		if (ret < 0)
+			return ret;
+	}
 	pnvl_dma_wait(pnvl_dev);
 
-	return ret;
+	return 0;
 }
 
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
@@ -120,6 +127,8 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 
 	atomic_set(&pnvl_dev->wq_flag, 0);
 	init_waitqueue_head(&pnvl_dev->wq);
+
+	pnvl_dev->dma.has_run = false;
 
 	return 0;
 }
