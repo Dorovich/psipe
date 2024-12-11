@@ -154,6 +154,9 @@ int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len)
 {
 	int ret, con;
 
+	if (len <= 0)
+		return PNVL_FAILURE;
+
 	if (dev->proxy.server_mode)
 		con = dev->proxy.client.sockd;
 	else

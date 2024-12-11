@@ -37,37 +37,50 @@ static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
 
 /*
  * Receive page: DMA buffer <-- RAM
+ *   pos: inout
+ * Return:
  */
-size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr)
+size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr, int *pos)
 {
 	int err;
-	size_t len, pgsize;
+	size_t ofs, len, len_max;
 	unsigned long mask;
+	const size_t pgsize = qemu_target_page_size();
+	const size_t len_total = dev->dma.config.len;
 
-	pgsize = qemu_target_page_size();
-	mask = pgsize-1;
-	addr = pnvl_dma_mask(addr);
-	len = pgsize;
+	mask = pnvl_dma_mask(pgsize-1);
+	ofs = addr & mask;
 
-	if ((addr & mask) + len > pgsize)
-		len = pgsize
-
+	len_max = len_total > pgsize ? pgsize : len_total;
+	len = len_max - ofs;
 	err = pci_dma_read(&dev->pci_dev, addr, dev->dma.buff, len);
 	if (err)
 		return PNVL_FAILURE;
 
-	return len;
+	if (!ofs)
+		return len;
+
+	*pos++;
+	addr = dev->dma.handles[*pos];
+	err = pci_dma_read(&dev->pci_dev, addr, dev->dma.buff + len, ofs);
+	if (err)
+		return PNVL_FAILURE;
+
+	return len_max; // len + ofs
 }
 
 /*
  * Transmit page: DMA buffer --> RAM
  */
+/* TODO: fix. see pnvl_dma_rx_page */
 int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t addr, size_t len)
 {
 	int err;
-	size_t pgsize;
+	const size_t pgsize = qemu_target_page_size();
 
-	pgsize = qemu_target_page_size();
+	if (len <= 0)
+		return PNVL_FAILURE;
+
 	addr = pnvl_dma_mask(addr);
 	err = pci_dma_write(&dev->pci_dev, addr, dev->dma.buff, len);
 	if (err)
@@ -79,7 +92,7 @@ int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t addr, size_t len)
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
 {
 	DMAEngine *dma = &dev->dma;
-	dma->handles[dma->config.npages++] = handle;
+	dma->handles[dma->config.npages++] = pnvl_dma_mask(handle);
 }
 
 bool pnvl_dma_is_idle(PNVLDevice *dev)
@@ -87,9 +100,9 @@ bool pnvl_dma_is_idle(PNVLDevice *dev)
 	return (qatomic_read(&dev->dma.status) == DMA_IDLE);
 }
 
-dma_addr_t pnvl_dma_next_page(PNVLDevice *dev/*, ? */)
+dma_addr_t pnvl_dma_next_page(PNVLDevice *dev, int pos, size_t len_sent)
 {
-	/* ? */
+	
 }
 
 void pnvl_dma_reset(PNVLDevice *dev)

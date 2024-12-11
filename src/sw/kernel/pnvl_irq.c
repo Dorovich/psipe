@@ -15,11 +15,11 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 	dev_dbg(&pnvl_dev->pdev->dev, "irq_handler irq = %d dev = %d\n", irq,
 		pnvl_dev->major);
 
-	pnvl_irq_ack(pnvl_dev);
-	pnvl_dma_dismantle(pnvl_dev);
-	pnvl_dma_wake(pnvl_dev);
-
 	pnvl_dev->running = false;
+
+	pnvl_dma_dismantle(pnvl_dev);
+	pnvl_irq_ack(pnvl_dev);
+	pnvl_dma_wake(pnvl_dev);
 
 	return IRQ_HANDLED;
 }

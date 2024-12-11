@@ -113,13 +113,17 @@ void pnvl_transfer_pages(PNVLDevice *dev)
 	dma_addr_t addr;
 	size_t len_total = dev->dma.config.len;
 	size_t len;
+	int ret;
+	int pos = 0;
 
-	for (int i = 0; i < dev->dma.config.npages; ++i) {
-		addr = dev->dma.config.handles[i];
+	do {
+		addr = pnvl_dma_next_addr(dev, pos, len);
 		len = pnvl_dma_rx_page(dev, addr);
-		pnvl_proxy_tx_page(dev, dev->dma.buffer, len);
+		ret = pnvl_proxy_tx_page(dev, dev->dma.buffer, len);
+		if (ret == PNVL_FAILURE)
+			return;
 		len_total -= len;
-	}
+	} while (len_total > 0);
 }
 
 void pnvl_receive_pages(PNVLDevice *dev)
@@ -127,19 +131,14 @@ void pnvl_receive_pages(PNVLDevice *dev)
 	dma_addr_t addr;
 	size_t len_total = dev->dma.config.len;
 	size_t len;
+	int ret;
 
-	for (int i = 0; i < dev->dma.config.npages; ++i) {
-		addr = dev->dma.config.handles[i];
-		len = pnvl_proxy_rx_page(dev, dev->dma.buffer);
-		pnvl_dma_tx_page(dev, addr, len);
-		len_total -= len;
-	}
-
-	do { /* TODO: Alternative code */
+	do {
 		addr = pnvl_dma_next_addr(dev);
 		len = pnvl_proxy_rx_page(dev, dev->dma.buffer);
-		pnvl_dma_tx_page(dev, addr, len);
+		ret = pnvl_dma_tx_page(dev, addr, len);
+		if (ret == PNVL_FAILURE)
+			return;
 		len_total -= len;
-		if (+ len < qemu_target_page_size())
 	} while (len_total > 0);
 }
