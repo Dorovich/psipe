@@ -24,8 +24,15 @@ typedef struct DMAConfig {
 	dma_size_t len;
 	dma_size_t len_avail;
 	dma_mask_t mask;
+	size_t page_size;
 	dma_addr_t handles[PNVL_HW_BAR0_DMA_WORK_AREA_SIZE];
 } DMAConfig;
+
+typedef struct DMACurrent {
+	dma_size_t len_left;
+	dma_addr_t addr;
+	int hnd_pos;
+} DMACurrent;
 
 typedef enum DMAStatus {
 	DMA_STATUS_IDLE,
@@ -35,6 +42,7 @@ typedef enum DMAStatus {
 
 typedef struct DMAEngine {
 	DMAConfig config;
+	DMACurrent current;
 	DMAStatus status;
 	uint8_t buff[PNVL_HW_DMA_AREA_SIZE];
 } DMAEngine;

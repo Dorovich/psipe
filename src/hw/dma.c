@@ -37,21 +37,19 @@ static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
 
 /*
  * Receive page: DMA buffer <-- RAM
- *   pos: inout
- * Return:
+ * TODO: use dma->current to keep track of page positions
  */
-size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr, int *pos)
+size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr, int *pos,
+			size_t len_left, const size_t page_size)
 {
 	int err;
 	size_t ofs, len, len_max;
 	unsigned long mask;
-	const size_t pgsize = qemu_target_page_size();
-	const size_t len_total = dev->dma.config.len;
 
-	mask = pnvl_dma_mask(pgsize-1);
+	mask = pnvl_dma_mask(page_size-1);
 	ofs = addr & mask;
 
-	len_max = len_total > pgsize ? pgsize : len_total;
+	len_max = len_left > page_size ? page_size : len_left;
 	len = len_max - ofs;
 	err = pci_dma_read(&dev->pci_dev, addr, dev->dma.buff, len);
 	if (err)
@@ -71,22 +69,36 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr, int *pos)
 
 /*
  * Transmit page: DMA buffer --> RAM
+ * TODO: use dma->current to keep track of page positions
  */
-/* TODO: fix. see pnvl_dma_rx_page */
-int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t addr, size_t len)
+int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t addr, int *pos, size_t len,
+		size_t len_total, const size_t page_size)
 {
 	int err;
-	const size_t pgsize = qemu_target_page_size();
+	size_t ofs, len_max;
+	unsigned long mask;
 
 	if (len <= 0)
 		return PNVL_FAILURE;
 
-	addr = pnvl_dma_mask(addr);
+	// TODO: fix. see pnvl_dma_rx_page
+
+	mask = pnvl_dma_mask(page_size-1);
+	ofs = addr & mask;
+
+	len_max = len_total > page_size ? page_size : len_total;
+	len = len_max - ofs;
 	err = pci_dma_write(&dev->pci_dev, addr, dev->dma.buff, len);
 	if (err)
 		return PNVL_FAILURE;
 
 	return PNVL_SUCCESS;
+}
+
+void pnvl_dma_init_current(PNVLDevice *dev, dma_size_t len_left)
+{
+	dev->dma.current.len_left = len_left;
+	dev->dma.current.hnd_pos = 0;
 }
 
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
@@ -100,18 +112,13 @@ bool pnvl_dma_is_idle(PNVLDevice *dev)
 	return (qatomic_read(&dev->dma.status) == DMA_IDLE);
 }
 
-dma_addr_t pnvl_dma_next_page(PNVLDevice *dev, int pos, size_t len_sent)
-{
-	
-}
-
 void pnvl_dma_reset(PNVLDevice *dev)
 {
 	DMAEngine *dma = &dev->dma;
 	dma->status = DMA_STATUS_IDLE;
 	dma->config.npages = 0;
 	dma->config.len = 0;
-	dma->config.mode = 0;
+	dma->config.page_size = qemu_target_page_size();
 	memset(dma->config.handles, 0, PNVL_HW_BAR0_DMA_WORK_AREA_SIZE);
 	memset(dma->buff, 0, PNVL_HW_DMA_AREA_SIZE);
 }
