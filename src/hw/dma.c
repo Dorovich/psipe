@@ -5,8 +5,9 @@
  */
 
 #include "dma.h"
-#include "qemu/osdep.h"
 #include "qemu/log.h"
+#include "qemu/osdep.h"
+#include <sys/param.h>
 
 /* ============================================================================
  * Private
@@ -37,67 +38,68 @@ static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
 
 /*
  * Receive page: DMA buffer <-- RAM
- * TODO: use dma->current to keep track of page positions
  */
-size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr, int *pos,
-			size_t len_left, const size_t page_size)
+int pnvl_dma_rx_page(PNVLDevice *dev)
 {
 	int err;
 	size_t ofs, len, len_max;
 	unsigned long mask;
+	DMAEngine *dma = &dev->dma;
 
-	mask = pnvl_dma_mask(page_size-1);
-	ofs = addr & mask;
+	mask = pnvl_dma_mask(dma->config.page_size - 1);
+	ofs = dma->current.addr & mask;
 
-	len_max = len_left > page_size ? page_size : len_left;
+	len_max = MIN(dma->current.len_left, dma->config.page_size);
 	len = len_max - ofs;
-	err = pci_dma_read(&dev->pci_dev, addr, dev->dma.buff, len);
+	err = pci_dma_read(&dev->pci_dev, dma->current.addr, dma->buff, len);
 	if (err)
 		return PNVL_FAILURE;
+	dma->current.len_total -= len;
 
 	if (!ofs)
 		return len;
 
-	*pos++;
-	addr = dev->dma.handles[*pos];
-	err = pci_dma_read(&dev->pci_dev, addr, dev->dma.buff + len, ofs);
+	dma->current.hnd_pos++;
+	dma->current.addr = dma->config.handles[dma->current.hnd_pos];
+	err = pci_dma_read(&dev->pci_dev, dma->current.addr,
+			dma->buff + len, ofs);
 	if (err)
 		return PNVL_FAILURE;
+	dma->current.addr += ofs;
+	dma->current.len_total -= ofs;
 
-	return len_max; // len + ofs
+	return len_max;
 }
 
 /*
  * Transmit page: DMA buffer --> RAM
- * TODO: use dma->current to keep track of page positions
  */
-int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t addr, int *pos, size_t len,
-		size_t len_total, const size_t page_size)
+int pnvl_dma_tx_page(PNVLDevice *dev, size_t len)
 {
 	int err;
 	size_t ofs, len_max;
 	unsigned long mask;
+	DMAEngine *dma = &dev->dma;
 
 	if (len <= 0)
 		return PNVL_FAILURE;
 
-	// TODO: fix. see pnvl_dma_rx_page
+	mask = pnvl_dma_mask(dma->config.page_size - 1);
+	ofs = dma->current.addr & mask;
 
-	mask = pnvl_dma_mask(page_size-1);
-	ofs = addr & mask;
-
-	len_max = len_total > page_size ? page_size : len_total;
+	len_max = MIN(dma->current.len_left, dma->config.page_size);
 	len = len_max - ofs;
-	err = pci_dma_write(&dev->pci_dev, addr, dev->dma.buff, len);
+	err = pci_dma_write(&dev->pci_dev, dma->current.addr, dma->buff, len);
 	if (err)
 		return PNVL_FAILURE;
 
 	return PNVL_SUCCESS;
 }
 
-void pnvl_dma_init_current(PNVLDevice *dev, dma_size_t len_left)
+void pnvl_dma_init_current(PNVLDevice *dev)
 {
-	dev->dma.current.len_left = len_left;
+	dev->dma.current.len_left = dev->dma.config.len;
+	dev->dma.current.addr = NULL;
 	dev->dma.current.hnd_pos = 0;
 }
 

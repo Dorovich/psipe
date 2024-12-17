@@ -113,22 +113,14 @@ type_init(pnvl_register_types)
  */
 void pnvl_transfer_pages(PNVLDevice *dev)
 {
-	dma_addr_t addr;
-	size_t len_total = dev->dma.config.len;
-	size_t len;
 	int ret;
-	int pos = 0;
+	size_t len;
 
 	pnvl_dma_init_current(dev);
-
 	do {
-		addr = dev->dma.handles[pos];
-		len = pnvl_dma_rx_page(dev, addr, &pos, len_total);
+		len = pnvl_dma_rx_page(dev);
 		ret = pnvl_proxy_tx_page(dev, dev->dma.buffer, len);
-		if (ret == PNVL_FAILURE)
-			return;
-		len_total -= len;
-	} while (len_total > 0);
+	} while (ret != PNVL_FAILURE && dev->dma.current.len_left > 0);
 }
 
 /*
@@ -136,20 +128,12 @@ void pnvl_transfer_pages(PNVLDevice *dev)
  */
 void pnvl_receive_pages(PNVLDevice *dev)
 {
-	dma_addr_t addr;
-	size_t len_total = dev->dma.config.len;
-	size_t len;
 	int ret;
+	size_t len;
 
 	pnvl_dma_init_current(dev);
-
 	do {
 		len = pnvl_proxy_rx_page(dev, dev->dma.buffer);
-		addr = dev->dma.handles[pos];
-		ret = pnvl_dma_tx_page(dev, addr, &pos, len, len_total,
-				page_size);
-		if (ret == PNVL_FAILURE)
-			return;
-		len_total -= len;
-	} while (len_total > 0);
+		ret = pnvl_dma_tx_page(dev, len);
+	} while (ret != PNVL_FAILURE && dev->dma.current.len_left > 0);
 }
