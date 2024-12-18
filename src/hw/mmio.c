@@ -24,6 +24,11 @@ static inline bool pnvl_mmio_valid_access(hwaddr addr, size_t size)
 	return (PNVL_HW_BAR0_START <= addr && addr <= PNVL_HW_BAR0_END);
 }
 
+static inline int pnvl_mmio_handle_pos(hwaddr addr)
+{
+	return ((addr - PNVL_HW_BAR0_HANDLES) / sizeof(addr));
+}
+
 static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, size_t size)
 {
 	PNVLDevice *dev = opaque;
@@ -54,8 +59,12 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 				size_t size)
 {
 	PNVLDevice *dev = opaque;
+	DMAEngine *dma = &dev->dma;
 
 	if (!pnvl_mmio_valid_access(addr, size))
+		return;
+
+	if (!pnvl_dma_is_idle(dev))
 		return;
 
 	switch(addr) {
@@ -66,31 +75,23 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 		pnvl_irq_lower(dev, 0);
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_LEN:
-		if (pnvl_dma_is_idle(dev))
-			dev->dma.config.len = val;
+		dma->config.len = val;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_PGS:
-		if (pnvl_dma_is_idle(dev))
-			dev->dma.config.npages = val;
+		dma->config.npages = val;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_OFS:
-		if (pnvl_dma_is_idle(dev))
-			dev->dma.config.offset = val;
+		dma->config.offset = val;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL:
-		if (pnvl_dma_is_idle(dev)) {
-			dev->dma.config.len_avail = val;
-			pnvl_proxy_issue_req(dev, PNVL_REQ_ALN);
-		}
+		dma->config.len_avail = val;
 		break;
 	case PNVL_HW_BAR0_DMA_DOORBELL_RING:
+		pnvl_proxy_issue_req(dev, PNVL_REQ_ALN);
 		pnvl_transfer_pages(dev);
 		break;
 	default: /* DMA handles area */
-		if (pnvl_dma_is_idle(dev)) {
-			int pos = (addr-PNVL_HW_BAR0_HANDLES)/sizeof(addr);
-			dev->dma.handle[pos] = val;
-		}
+		dma->handle[pnvl_mmio_handle_pos(addr)] = val;
 		break;
 	}
 }

@@ -108,9 +108,6 @@ type_init(pnvl_register_types)
  * ============================================================================
  */
 
-/*
- * TODO: dma will use dma->current, some things will be obsolete
- */
 void pnvl_transfer_pages(PNVLDevice *dev)
 {
 	int ret;
@@ -120,12 +117,9 @@ void pnvl_transfer_pages(PNVLDevice *dev)
 	do {
 		len = pnvl_dma_rx_page(dev);
 		ret = pnvl_proxy_tx_page(dev, dev->dma.buffer, len);
-	} while (ret != PNVL_FAILURE && dev->dma.current.len_left > 0);
+	} while (ret != PNVL_FAILURE && !pnvl_dma_finished(dev));
 }
 
-/*
- * TODO: dma will use dma->current, some things will be obsolete
- */
 void pnvl_receive_pages(PNVLDevice *dev)
 {
 	int ret;
@@ -135,5 +129,5 @@ void pnvl_receive_pages(PNVLDevice *dev)
 	do {
 		len = pnvl_proxy_rx_page(dev, dev->dma.buffer);
 		ret = pnvl_dma_tx_page(dev, len);
-	} while (ret != PNVL_FAILURE && dev->dma.current.len_left > 0);
+	} while (ret != PNVL_FAILURE && !pnvl_dma_finished(dev));
 }

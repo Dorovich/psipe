@@ -116,6 +116,11 @@ void pnvl_dma_init_current(PNVLDevice *dev)
 	dev->dma.current.hnd_pos = 0;
 }
 
+bool pnvl_dma_finished(PNVLDevice *dev)
+{
+	return dev->dma.current.len_left == 0;
+}
+
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
 {
 	DMAEngine *dma = &dev->dma;
