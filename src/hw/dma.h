@@ -52,8 +52,8 @@ typedef struct DMAEngine {
  * ============================================================================
  */
 
-size_t pnvl_dma_rx_page(PNVLDevice *dev, dma_addr_t addr);
-int pnvl_dma_tx_page(PNVLDevice *dev, dma_addr_t addr, size_t len);
+size_t pnvl_dma_rx_page(PNVLDevice *dev);
+int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in);
 
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle);
 bool pnvl_dma_is_idle(PNVLDevice *dev);

@@ -74,7 +74,7 @@ int pnvl_dma_rx_page(PNVLDevice *dev)
 /*
  * Transmit page: DMA buffer --> RAM
  */
-int pnvl_dma_tx_page(PNVLDevice *dev, size_t len)
+int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in)
 {
 	int err;
 	size_t ofs, len_max;
@@ -88,10 +88,23 @@ int pnvl_dma_tx_page(PNVLDevice *dev, size_t len)
 	ofs = dma->current.addr & mask;
 
 	len_max = MIN(dma->current.len_left, dma->config.page_size);
-	len = len_max - ofs;
+	len = MIN(len_in, len_max) - ofs;
 	err = pci_dma_write(&dev->pci_dev, dma->current.addr, dma->buff, len);
 	if (err)
 		return PNVL_FAILURE;
+	dma->current.len_total -= len;
+
+	if (!ofs)
+		return PNVL_SUCCESS;
+
+	dma->current.hnd_pos++;
+	dma->current.addr = dma->config.handles[dma->current.hnd_pos];
+	err = pci_dma_read(&dev->pci_dev, dma->current.addr,
+			dma->buff + len, ofs);
+	if (err)
+		return PNVL_FAILURE;
+	dma->current.addr += ofs;
+	dma->current.len_total -= ofs;
 
 	return PNVL_SUCCESS;
 }

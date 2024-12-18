@@ -128,17 +128,17 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
  */
 size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 {
-	int ret, con;
+	int ret, src;
 	size_t len = 0;
 	PNVLProxy *proxy = &dev->proxy;
 
-	con = proxy->server_mode ? proxy->client.sockd : proxy->server.sockd;
+	src = proxy->server_mode ? proxy->client.sockd : proxy->server.sockd;
 
-	ret = recv(con, &len, sizeof(len), 0);
+	ret = recv(src, &len, sizeof(len), 0);
 	if (ret < 0 || !len)
 		return PNVL_FAILURE;
 
-	ret = recv(con, buff, len, 0);
+	ret = recv(src, buff, len, 0);
 	if (ret < 0)
 		return PNVL_FAILURE;
 
@@ -150,19 +150,19 @@ size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
  */
 int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len)
 {
-	int ret, con;
+	int ret, dst;
 	PNVLProxy *proxy = &dev->proxy;
 
 	if (len <= 0)
 		return PNVL_FAILURE;
 
-	con = proxy->server_mode ? proxy->client.sockd : proxy->server.sockd;
+	dst = proxy->server_mode ? proxy->client.sockd : proxy->server.sockd;
 
-	ret = send(con, &len, sizeof(len), 0);
+	ret = send(dst, &len, sizeof(len), 0);
 	if (ret < 0)
 		return PNVL_FAILURE;
 
-	ret = send(con, buff, len, 0);
+	ret = send(dst, buff, len, 0);
 	if (ret < 0)
 		return PNVL_FAILURE;
 
