@@ -80,15 +80,14 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 	case PNVL_HW_BAR0_DMA_CFG_PGS:
 		dma->config.npages = val;
 		break;
-	case PNVL_HW_BAR0_DMA_CFG_OFS:
-		dma->config.offset = val;
+	case PNVL_HW_BAR0_DMA_CFG_MOD:
+		dma->mode = val > 0 ? DMA_MODE_ACTIVE : DMA_MODE_PASSIVE;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL:
 		dma->config.len_avail = val;
 		break;
 	case PNVL_HW_BAR0_DMA_DOORBELL_RING:
-		pnvl_proxy_issue_req(dev, PNVL_REQ_ALN);
-		pnvl_transfer_pages(dev);
+		pnvl_execute(dev);
 		break;
 	default: /* DMA handles area */
 		dma->handle[pnvl_mmio_handle_pos(addr)] = val;

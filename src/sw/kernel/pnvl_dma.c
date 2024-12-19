@@ -59,8 +59,8 @@ static int pnvl_dma_setup_handles(struct pnvl_dev *pnvl_dev)
 	for (int i = 1; i < dma->npages; ++i) {
 		len_map = len > PAGE_SIZE ?  PAGE_SIZE : len;
 		len -= len_map;
-		handles[i] = dma_map_page(pdev, dma->pages[i], dma->offset,
-					len_map, dma->direction);
+		handles[i] = dma_map_page(pdev, dma->pages[i], 0, len_map,
+				dma->direction);
 		if (dma_mapping_error(pdev, handles[i])) {
 			err = -ENOMEM;
 			goto err_dma_map;
@@ -79,12 +79,13 @@ static void pnvl_dma_setup_consolidate(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	void __iomem *mmio = pnvl_dev->bar.mmio;
-	size_t ofs = 0;
+	size_t ofs;
 
 	iowrite32(dma->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
 	iowrite32(dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
-	iowrite32(dma->offset, mmio + PNVL_HW_BAR0_DMA_CFG_OFS);
+	iowrite32(dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
 
+	ofs = 0;
 	for (int i = 0; i < dma->npages; ++i) {
 		iowrite32((u32)dma->handle[i],
 			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
@@ -98,7 +99,7 @@ void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
 	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
 }
 
-int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, enum dma_data_direction dir)
+int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, dma_size_t mode)
 {
 	int ret;
 
@@ -106,6 +107,7 @@ int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, enum dma_data_direction dir)
 		return -ENOSPC;
 
 	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
+	pnvl_dev->dma.mode = mode;
 
 	ret = pnvl_dma_setup_pages(pnvl_dev);
 	if (ret < 0)

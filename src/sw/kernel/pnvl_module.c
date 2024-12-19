@@ -47,7 +47,7 @@ static int pnvl_ioctl_work(struct pnvl_dev *pnvl_dev)
 	if (pnvl_dev->running)
 		return -EBUSY;
 
-	ret = pnvl_dma_setup(pnvl_dev);
+	ret = pnvl_dma_setup(pnvl_dev, true);
 	if (ret < 0)
 		return ret;
 	pnvl_dma_doorbell_ring(pnvl_dev);
@@ -62,7 +62,7 @@ static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 	int ret;
 
 	if (!pnvl_dev->running) {
-		ret = pnvl_dma_setup(pnvl_dev);
+		ret = pnvl_dma_setup(pnvl_dev, false);
 		if (ret < 0)
 			return ret;
 	}

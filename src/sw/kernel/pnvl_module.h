@@ -12,8 +12,8 @@
 #include <linux/pci.h>
 #include <linux/wait.h>
 
-#define PNVL_MODE_WORK 0x01
-#define PNVL_MODE_WAIT 0x02
+#define PNVL_MODE_ACTIVE 0x01
+#define PNVL_MODE_PASSIVE 0x00
 
 /* forward declaration */
 struct pnvl_dev;
@@ -27,9 +27,10 @@ struct pnvl_bar {
 
 struct pnvl_dma {
 	dma_addr_t *dma_handles;
-	size_t offset;
-	size_t len;
-	size_t npages;
+	dma_size_t offset;
+	dma_size_t len;
+	dma_size_t npages;
+	dma_size_t mode;
 	enum dma_data_direction direction;
 	struct page **pages;
 };

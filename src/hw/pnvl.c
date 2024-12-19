@@ -104,11 +104,11 @@ static void pnvl_register_types(void)
 type_init(pnvl_register_types)
 
 /* ============================================================================
- * Public
+ * Private
  * ============================================================================
  */
 
-void pnvl_transfer_pages(PNVLDevice *dev)
+static void pnvl_transfer_pages(PNVLDevice *dev)
 {
 	int ret;
 	size_t len;
@@ -120,7 +120,7 @@ void pnvl_transfer_pages(PNVLDevice *dev)
 	} while (ret != PNVL_FAILURE && !pnvl_dma_finished(dev));
 }
 
-void pnvl_receive_pages(PNVLDevice *dev)
+static void pnvl_receive_pages(PNVLDevice *dev)
 {
 	int ret;
 	size_t len;
@@ -130,4 +130,23 @@ void pnvl_receive_pages(PNVLDevice *dev)
 		len = pnvl_proxy_rx_page(dev, dev->dma.buffer);
 		ret = pnvl_dma_tx_page(dev, len);
 	} while (ret != PNVL_FAILURE && !pnvl_dma_finished(dev));
+}
+
+/* ============================================================================
+ * Public
+ * ============================================================================
+ */
+
+void pnvl_execute(PNVLDevice *dev)
+{
+	switch(dev->dma.mode) {
+	case DMA_MODE_ACTIVE:
+		pnvl_proxy_issue_req(dev, PNVL_REQ_ALN);
+		pnvl_transfer_pages(dev);
+		break;
+	case DMA_MODE_PASSIVE:
+		pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+		pnvl_receive_pages(dev);
+		break;
+	}
 }

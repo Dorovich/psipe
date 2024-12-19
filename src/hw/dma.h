@@ -20,7 +20,6 @@ typedef uint64_t dma_mask_t;
 
 typedef struct DMAConfig {
 	dma_size_t npages;
-	dma_size_t offset;
 	dma_size_t len;
 	dma_size_t len_avail;
 	dma_mask_t mask;
@@ -40,10 +39,16 @@ typedef enum DMAStatus {
 	DMA_STATUS_OFF,
 } DMAStatus;
 
+typedef enum DMAMode {
+	DMA_MODE_ACTIVE,
+	DMA_MODE_PASSIVE,
+} DMAMode;
+
 typedef struct DMAEngine {
 	DMAConfig config;
 	DMACurrent current;
 	DMAStatus status;
+	DMAMode mode;
 	uint8_t buff[PNVL_HW_DMA_AREA_SIZE];
 } DMAEngine;
 
