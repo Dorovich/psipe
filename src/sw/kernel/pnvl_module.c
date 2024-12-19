@@ -10,8 +10,9 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <strings.h>
 
-MODULE_LISCENSE("GPL");
+MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0");
 MODULE_DESCRIPTION("Kernel module to control the pnvl virtual device");
 MODULE_AUTHOR("David Cañadas López <dcanadas@bsc.es>");
@@ -74,12 +75,11 @@ static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
-	struct pnvl_data __user *udata = arg;
-	int ret;
+	struct pnvl_data __user *udata = (struct pnvl_data *)arg;
 
 	if (!udata && !pnvl_dev->data.addr)
 		return -EINVAL;
-	copy_from_user(&dev->data, udata, sizeof(dev->data));
+	copy_from_user(&pnvl_dev->data, udata, sizeof(pnvl_dev->data));
 
 	switch(cmd) {
 	case PNVL_IOCTL_WORK:

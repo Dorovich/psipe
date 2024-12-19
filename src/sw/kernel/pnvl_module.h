@@ -7,6 +7,7 @@
 #pragma once
 
 #include "hw/pnvl_hw.h"
+#include "sw/module/pnvl_ioctl.h"
 #include <linux/atomic.h>
 #include <linux/cdev.h>
 #include <linux/pci.h>
@@ -27,10 +28,10 @@ struct pnvl_bar {
 
 struct pnvl_dma {
 	dma_addr_t *dma_handles;
-	dma_size_t offset;
-	dma_size_t len;
-	dma_size_t npages;
-	dma_size_t mode;
+	size_t offset;
+	size_t len;
+	size_t npages;
+	int mode;
 	enum dma_data_direction direction;
 	struct page **pages;
 };
@@ -41,6 +42,9 @@ struct pnvl_irq {
 };
 
 struct pnvl_dev {
+	bool running;
+	int wq_flag;
+	wait_queue_head_t wq;
 	struct pci_dev *pdev;
 	struct pnvl_bar bar;
 	struct pnvl_irq irq;
@@ -49,7 +53,4 @@ struct pnvl_dev {
 	dev_t minor;
 	dev_t major;
 	struct cdev cdev;
-	atomic_t wq_flag;
-	wait_queue_head_t wq;
-	bool running;
 };
