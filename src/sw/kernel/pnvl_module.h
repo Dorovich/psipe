@@ -12,8 +12,8 @@
 #include <linux/pci.h>
 #include <linux/wait.h>
 
-#define PNVL_MODE_ACTIVE 0x01
-#define PNVL_MODE_PASSIVE 0x00
+#define PNVL_MODE_ACTIVE 1
+#define PNVL_MODE_PASSIVE 0
 
 /* forward declaration */
 struct pnvl_dev;
