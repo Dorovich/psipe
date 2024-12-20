@@ -1,7 +1,7 @@
 # Makefile for the Proto-NVLink kernel module
 
 obj-m += pnvl.o
-pnvl-objs += pnvl_dma.o pnvl_irq.o pnvl_module.o
+pnvl-objs += pnvl_module.o pnvl_dma.o pnvl_irq.o
 ccflags-y = -I${HOME}/src/proto-nvlink/include
 
 all:

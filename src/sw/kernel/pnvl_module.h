@@ -4,11 +4,12 @@
  *
  */
 
-#pragma once
+#ifndef _PNVL_MODULE_H_
+#define _PNVL_MODULE_H_
+// #pragma once
 
 #include "hw/pnvl_hw.h"
 #include "sw/module/pnvl_ioctl.h"
-#include <linux/atomic.h>
 #include <linux/cdev.h>
 #include <linux/pci.h>
 #include <linux/wait.h>
@@ -54,3 +55,13 @@ struct pnvl_dev {
 	dev_t major;
 	struct cdev cdev;
 };
+
+void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
+int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, int mode);
+void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev);
+void pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
+void pnvl_dma_wake(struct pnvl_dev *pnvl_dev);
+
+int pnvl_irq_enable(struct pnvl_dev *pnvl_dev);
+
+#endif /* _PNVL_MODULE_H_ */

@@ -8,6 +8,11 @@
 #include "pnvl_module.h"
 #include <linux/pci.h>
 
+static inline void pnvl_irq_ack(struct pnvl_dev *pnvl_dev)
+{
+	iowrite32(1, pnvl_dev->irq.mmio_ack_irq);
+}
+
 static irqreturn_t pnvl_irq_handler(int irq, void *data)
 {
 	struct pnvl_dev *pnvl_dev = data;
@@ -22,11 +27,6 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 	pnvl_dma_wake(pnvl_dev);
 
 	return IRQ_HANDLED;
-}
-
-static void pnvl_irq_ack(struct pnvl_dev *pnvl_dev)
-{
-	iowrite32(1, pnvl_dev->irq.mmio_ack_irq);
 }
 
 static int pnvl_irq_enable_intx(struct pnvl_dev *pnvl_dev)

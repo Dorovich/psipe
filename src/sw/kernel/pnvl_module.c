@@ -10,7 +10,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/pci.h>
-#include <strings.h>
+#include <linux/string.h>
 
 MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0");
@@ -76,10 +76,13 @@ static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
 	struct pnvl_data __user *udata = (struct pnvl_data *)arg;
+	unsigned long len;
 
 	if (!udata && !pnvl_dev->data.addr)
 		return -EINVAL;
-	copy_from_user(&pnvl_dev->data, udata, sizeof(pnvl_dev->data));
+	len = copy_from_user(&pnvl_dev->data, udata, sizeof(pnvl_dev->data));
+	if (len < sizeof(pnvl_dev->data))
+		return -EINVAL;
 
 	switch(cmd) {
 	case PNVL_IOCTL_WORK:
@@ -125,10 +128,10 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	}
 	pci_set_drvdata(pdev, pnvl_dev);
 
-	atomic_set(&pnvl_dev->wq_flag, 0);
+	pnvl_dev->wq_flag = 0;
 	init_waitqueue_head(&pnvl_dev->wq);
 
-	pnvl_dev->dma.has_run = false;
+	pnvl_dev->running = false;
 
 	return 0;
 }
@@ -231,7 +234,7 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_irq_enable;
 	}
 
-	bzero(&pnvl_dev->data, sizeof(pnvl_dev->data));
+	memset(&pnvl_dev->data, 0, sizeof(pnvl_dev->data));
 
 	dev_info(&pdev->dev, "pnvl probe - success\n");
 
