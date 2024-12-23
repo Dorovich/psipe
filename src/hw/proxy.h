@@ -4,9 +4,10 @@
  *
  */
 
-#pragma once
+#ifndef PNVL_PROXY_H
+#define PNVL_PROXY_H
 
-#include "qapi/qmp/bool.h"
+#include "qapi/qmp/qbool.h"
 #include "qemu/typedefs.h"
 #include <sys/socket.h>
 
@@ -46,6 +47,9 @@ typedef struct PNVLProxy {
 size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff);
 int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len);
 
+bool pnvl_proxy_get_mode(Object *obj, Error **errp);
+void pnvl_proxy_set_mode(Object *obj, bool mode, Error **errp);
+
 int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req);
 int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req);
 ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev);
@@ -53,3 +57,5 @@ ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev);
 void pnvl_proxy_reset(PNVLDevice *dev);
 void pnvl_proxy_init(PNVLDevice *dev, Error **errp);
 void pnvl_proxy_fini(PNVLDevice *dev);
+
+#endif /* PNVL_PROXY_H */

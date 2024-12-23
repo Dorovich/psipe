@@ -20,10 +20,10 @@
 static void pnvl_device_init(PCIDevice *pci_dev, Error **errp)
 {
 	PNVLDevice *dev = PNVL_DEVICE(pci_dev);
-	pnvl_irq_init(dev);
-	pnvl_dma_init(dev);
-	pnvl_mmio_init(dev);
-	pnvl_proxy_init(dev);
+	pnvl_irq_init(dev, errp);
+	pnvl_dma_init(dev, errp);
+	pnvl_mmio_init(dev, errp);
+	pnvl_proxy_init(dev, errp);
 }
 
 static void pnvl_device_fini(PCIDevice *pci_dev)
@@ -90,7 +90,7 @@ static const TypeInfo pnvl_info = {
 	.instance_size = sizeof(PNVLDevice),
 	.instance_init = pnvl_instance_init,
 	.class_init = pnvl_class_init,
-	.interfaces = (InferfaceInfo[]){
+	.interfaces = (InterfaceInfo[]){
 		{ INTERFACE_PCIE_DEVICE },
 		{},
 	},
@@ -116,8 +116,8 @@ static void pnvl_transfer_pages(PNVLDevice *dev)
 	pnvl_dma_init_current(dev);
 	do {
 		len = pnvl_dma_rx_page(dev);
-		ret = pnvl_proxy_tx_page(dev, dev->dma.buffer, len);
-	} while (ret != PNVL_FAILURE && !pnvl_dma_finished(dev));
+		ret = pnvl_proxy_tx_page(dev, dev->dma.buff, len);
+	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
 }
 
 static void pnvl_receive_pages(PNVLDevice *dev)
@@ -127,9 +127,9 @@ static void pnvl_receive_pages(PNVLDevice *dev)
 
 	pnvl_dma_init_current(dev);
 	do {
-		len = pnvl_proxy_rx_page(dev, dev->dma.buffer);
+		len = pnvl_proxy_rx_page(dev, dev->dma.buff);
 		ret = pnvl_dma_tx_page(dev, len);
-	} while (ret != PNVL_FAILURE && !pnvl_dma_finished(dev));
+	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
 }
 
 /* ============================================================================

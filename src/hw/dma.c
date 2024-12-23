@@ -39,14 +39,14 @@ static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
 /*
  * Receive page: DMA buffer <-- RAM
  */
-int pnvl_dma_rx_page(PNVLDevice *dev)
+size_t pnvl_dma_rx_page(PNVLDevice *dev)
 {
 	int err;
 	size_t ofs, len, len_max;
 	unsigned long mask;
 	DMAEngine *dma = &dev->dma;
 
-	mask = pnvl_dma_mask(dma->config.page_size - 1);
+	mask = pnvl_dma_mask(dev, dma->config.page_size - 1);
 	ofs = dma->current.addr & mask;
 
 	len_max = MIN(dma->current.len_left, dma->config.page_size);
@@ -84,7 +84,7 @@ int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in)
 	if (len <= 0)
 		return PNVL_FAILURE;
 
-	mask = pnvl_dma_mask(dma->config.page_size - 1);
+	mask = pnvl_dma_mask(dev, dma->config.page_size - 1);
 	ofs = dma->current.addr & mask;
 
 	len_max = MIN(dma->current.len_left, dma->config.page_size);
@@ -116,11 +116,6 @@ void pnvl_dma_init_current(PNVLDevice *dev)
 	dev->dma.current.hnd_pos = 0;
 }
 
-bool pnvl_dma_finished(PNVLDevice *dev)
-{
-	return dev->dma.current.len_left == 0;
-}
-
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
 {
 	DMAEngine *dma = &dev->dma;
@@ -130,6 +125,11 @@ void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
 bool pnvl_dma_is_idle(PNVLDevice *dev)
 {
 	return (qatomic_read(&dev->dma.status) == DMA_IDLE);
+}
+
+bool pnvl_dma_is_finished(PNVLDevice *dev)
+{
+	return dev->dma.current.len_left == 0;
 }
 
 void pnvl_dma_reset(PNVLDevice *dev)

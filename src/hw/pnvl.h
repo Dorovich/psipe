@@ -4,7 +4,8 @@
  *
  */
 
-#pragma once
+#ifndef PNVL_H
+#define PNVL_H
 
 #include "dma.h"
 #include "hw/pci/pci.h"
@@ -41,5 +42,6 @@ typedef struct PNVLDevice {
  * ============================================================================
  */
 
-void pnvl_transfer_pages(PNVLDevice *dev);
-void pnvl_receive_pages(PNVLDevice *dev);
+void pnvl_execute(PNVLDevice *dev);
+
+#endif /* PNVL_H */

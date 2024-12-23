@@ -4,11 +4,12 @@
  *
  */
 
-#pragma once
+#ifndef PNVL_DMA_H
+#define PNVL_DMA_H
 
-#include "qemu/osdep.h"
 #include "hw/pci/pci.h"
 #include "pnvl_hw.h"
+#include "qemu/osdep.h"
 
 #define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : ((1ULL << (n)) - 1))
 
@@ -24,7 +25,7 @@ typedef struct DMAConfig {
 	dma_size_t len_avail;
 	dma_mask_t mask;
 	size_t page_size;
-	dma_addr_t handles[PNVL_HW_BAR0_DMA_WORK_AREA_SIZE];
+	dma_addr_t handles[PNVL_HW_BAR0_DMA_HANDLES_CNT];
 } DMAConfig;
 
 typedef struct DMACurrent {
@@ -60,9 +61,13 @@ typedef struct DMAEngine {
 size_t pnvl_dma_rx_page(PNVLDevice *dev);
 int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in);
 
+void pnvl_dma_init_current(PNVLDevice *dev);
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle);
 bool pnvl_dma_is_idle(PNVLDevice *dev);
+bool pnvl_dma_is_finished(PNVLDevice *dev);
 
 void pnvl_dma_reset(PNVLDevice *dev);
 void pnvl_dma_init(PNVLDevice *dev, Error **errp);
 void pnvl_dma_fini(PNVLDevice *dev);
+
+#endif /* PNVL_DMA_H */

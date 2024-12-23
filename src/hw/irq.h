@@ -4,7 +4,8 @@
  *
  */
 
-#pragma once
+#ifndef PNVL_IRQ_H
+#define PNVL_IRQ_H
 
 #include "hw/pci/pci.h"
 #include "qemu/osdep.h"
@@ -31,3 +32,5 @@ void pnvl_irq_lower(PNVLDevice *dev, unsigned int pin);
 void pnvl_irq_reset(PNVLDevice *dev);
 void pnvl_irq_init(PNVLDevice *dev, Error **errp);
 void pnvl_irq_fini(PNVLDevice *dev);
+
+#endif /* PNVL_IRQ_H */

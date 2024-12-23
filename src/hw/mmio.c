@@ -5,12 +5,10 @@
  */
 
 #include "exec/target_page.h"
-#include "irq.h"
 #include "mmio.h"
 #include "pnvl_hw.h"
-#include "qemu/error.h"
+#include "qapi/error.h"
 #include "qemu/log.h"
-#include "qemu/osdep.h"
 #include "qemu/osdep.h"
 #include "qemu/units.h"
 

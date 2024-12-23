@@ -5,13 +5,15 @@
  */
 
 #include "proxy.h"
+#include "qemu/log.h"
+#include "qemu/osdep.h"
 
 /* ============================================================================
  * Private
  * ============================================================================
  */
 
-void pnvl_proxy_init_server(PNVLDevice *dev)
+static void pnvl_proxy_init_server(PNVLDevice *dev)
 {
 	int ret;
 	PNVLProxy *proxy = &dev->proxy;
@@ -44,7 +46,7 @@ void pnvl_proxy_init_server(PNVLDevice *dev)
 	close(proxy->server.sockd);
 }
 
-void pnvl_proxy_init_client(PNVLDevice *dev)
+static void pnvl_proxy_init_client(PNVLDevice *dev)
 {
 	int ret;
 	PNVLProxy *proxy = &dev->proxy;
@@ -167,6 +169,18 @@ int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len)
 		return PNVL_FAILURE;
 
 	return PNVL_SUCCESS;
+}
+
+bool pnvl_proxy_get_mode(Object *obj, Error **errp)
+{
+	PNVLDevice *dev = PNVL(obj);
+	return dev->proxy.server_mode;
+}
+
+void pnvl_proxy_set_mode(Object *obj, bool mode, Error **errp)
+{
+	PNVLDevice *dev = PNVL(obj);
+	dev->proxy.server_mode = mode;
 }
 
 void pnvl_proxy_reset(PNVLDevice *dev)

@@ -4,7 +4,8 @@
  *
  */
 
-#pragma once
+#ifndef PNVL_MMIO_H
+#define PNVL_MMIO_H
 
 #include "pnvl.h"
 
@@ -21,3 +22,5 @@ void pnvl_mmio_init(PNVLDevice *dev, Error **errp);
 void pnvl_mmio_fini(PNVLDevice *dev);
 
 extern const MemoryRegionOps pnvl_mmio_ops;
+
+#endif /* PNVL_MMIO_H */
