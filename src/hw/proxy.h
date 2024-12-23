@@ -7,7 +7,8 @@
 #ifndef PNVL_PROXY_H
 #define PNVL_PROXY_H
 
-#include "qapi/qmp/qbool.h"
+#include "pnvl.h"
+#include "qemu/osdep.h"
 #include "qemu/typedefs.h"
 #include <sys/socket.h>
 

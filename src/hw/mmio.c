@@ -5,6 +5,7 @@
  */
 
 #include "exec/target_page.h"
+#include "irq.h"
 #include "mmio.h"
 #include "pnvl_hw.h"
 #include "qapi/error.h"

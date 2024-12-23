@@ -6,7 +6,6 @@
 
 #include "irq.h"
 #include "pnvl.h"
-#include "qapi/qmp/qbool.h"
 #include "qemu/log.h"
 #include "qemu/osdep.h"
 

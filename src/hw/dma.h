@@ -10,6 +10,7 @@
 #include "hw/pci/pci.h"
 #include "pnvl_hw.h"
 #include "qemu/osdep.h"
+#include <sys/types.h>
 
 #define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : ((1ULL << (n)) - 1))
 
