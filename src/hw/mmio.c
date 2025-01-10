@@ -4,31 +4,31 @@
  *
  */
 
+#include "qemu/osdep.h"
 #include "exec/target_page.h"
-#include "irq.h"
-#include "mmio.h"
-#include "pnvl_hw.h"
 #include "qapi/error.h"
 #include "qemu/log.h"
-#include "qemu/osdep.h"
 #include "qemu/units.h"
+#include "mmio.h"
+#include "irq.h"
+#include "pnvl_hw.h"
 
 /* ============================================================================
  * Private
  * ============================================================================
  */
 
-static inline bool pnvl_mmio_valid_access(hwaddr addr, size_t size)
+static inline bool pnvl_mmio_valid_access(hwaddr addr, unsigned int size)
 {
 	return (PNVL_HW_BAR0_START <= addr && addr <= PNVL_HW_BAR0_END);
 }
 
 static inline int pnvl_mmio_handle_pos(hwaddr addr)
 {
-	return ((addr - PNVL_HW_BAR0_HANDLES) / sizeof(addr));
+	return ((addr - PNVL_HW_BAR0_DMA_HANDLES) / sizeof(addr));
 }
 
-static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, size_t size)
+static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 {
 	PNVLDevice *dev = opaque;
 	uint64_t val = ~0ULL;
@@ -43,11 +43,11 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, size_t size)
 	case PNVL_HW_BAR0_DMA_CFG_PGS:
 		val = dev->dma.config.npages;
 		break;
-	case PNVL_HW_BAR0_DMA_CFG_OFS:
-		val = dev->dma.config.offset;
+	case PNVL_HW_BAR0_DMA_CFG_MOD:
+		val = dev->dma.mode;
 		break;
-	case PNVL_HW_BAR0_DMA_CFG_MODE:
-		val = dev->dma.config.mode;
+	case PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL:
+		val = dev->dma.config.len_avail;
 		break;
 	}
 
@@ -55,7 +55,7 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, size_t size)
 }
 
 static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
-				size_t size)
+				unsigned int size)
 {
 	PNVLDevice *dev = opaque;
 	DMAEngine *dma = &dev->dma;
@@ -89,7 +89,7 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 		pnvl_execute(dev);
 		break;
 	default: /* DMA handles area */
-		dma->handle[pnvl_mmio_handle_pos(addr)] = val;
+		dma->config.handles[pnvl_mmio_handle_pos(addr)] = val;
 		break;
 	}
 }
@@ -109,13 +109,13 @@ void pnvl_mmio_init(PNVLDevice *dev, Error **errp)
 	memory_region_init_io(&dev->mmio, OBJECT(dev), &pnvl_mmio_ops, dev,
 			"pnvl-mmio", qemu_target_page_size());
 
-	pci_register_bar(&dev->pci_dev, 0, PCI_BASE_ADRESS_SPACE_MEMORY,
+	pci_register_bar(&dev->pci_dev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY,
 			&dev->mmio);
 }
 
 void pnvl_mmio_fini(PNVLDevice *dev)
 {
-	pnvl_mmio_reset();
+	pnvl_mmio_reset(dev);
 }
 
 const MemoryRegionOps pnvl_mmio_ops = {

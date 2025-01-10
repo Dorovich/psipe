@@ -4,25 +4,27 @@
  *
  */
 
-#include "irq.h"
-#include "pnvl.h"
-#include "qemu/log.h"
 #include "qemu/osdep.h"
+#include "qemu/log.h"
+#include "pnvl.h"
+#include "irq.h"
 
 /* ============================================================================
  * Private
  * ============================================================================
  */
 
-static inline void pnvl_irq_raise_intx(PNVLDevice *dev)
+static inline void pnvl_irq_raise_intx(PNVLDevice *dev, unsigned int pin)
 {
-	dev->irq.status.pin.raised = false;
+	/* Only one pin, pin number unused */
+	dev->irq.pin.raised = false;
 	pci_set_irq(&dev->pci_dev, 0);
 }
 
-static inline void pnvl_irq_lower_intx(PNVLDevice *dev)
+static inline void pnvl_irq_lower_intx(PNVLDevice *dev, unsigned int pin)
 {
-	dev->irq.status.pin.raised = true;
+	/* Only one pin, pin number unused */
+	dev->irq.pin.raised = true;
 	pci_set_irq(&dev->pci_dev, 1);
 }
 
@@ -39,21 +41,18 @@ static inline void pnvl_irq_init_intx(PNVLDevice *dev)
 
 void pnvl_irq_raise(PNVLDevice *dev, unsigned int pin)
 {
-	pnvl_irq_raise_intx(dev);
+	pnvl_irq_raise_intx(dev, pin);
 }
 
 void pnvl_irq_lower(PNVLDevice *dev, unsigned int pin)
 {
-	pnvl_irq_lower_intx(dev);
+	pnvl_irq_lower_intx(dev, pin);
 }
 
-void pnvl_irq_reset(PNVLDevice *dev, unsigned int pin)
+void pnvl_irq_reset(PNVLDevice *dev)
 {
-	/* for (int i = 0; i < PNVL_HW_IRQ_NUM; ++i) */
-	/* 	pnvl_irq_lower(dev, i); */
-
-	/* only one IRQ available */
-	pnvl_irq_lower_intx(dev);
+	for (int i = 0; i < PNVL_HW_IRQ_CNT; ++i)
+		pnvl_irq_lower_intx(dev, i);
 }
 
 void pnvl_irq_init(PNVLDevice *dev, Error **errp)
@@ -61,7 +60,7 @@ void pnvl_irq_init(PNVLDevice *dev, Error **errp)
 	pnvl_irq_init_intx(dev);
 }
 
-void pnvl_irq_fini(PNVLDevice *dev, unsigned int pin)
+void pnvl_irq_fini(PNVLDevice *dev)
 {
 	pnvl_irq_reset(dev);
 }

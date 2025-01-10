@@ -6,7 +6,6 @@
 
 #ifndef _PNVL_MODULE_H_
 #define _PNVL_MODULE_H_
-// #pragma once
 
 #include "hw/pnvl_hw.h"
 #include "sw/module/pnvl_ioctl.h"

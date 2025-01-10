@@ -7,7 +7,6 @@
 #ifndef PNVL_PROXY_H
 #define PNVL_PROXY_H
 
-#include "pnvl.h"
 #include "qemu/osdep.h"
 #include "qemu/typedefs.h"
 #include <sys/socket.h>

@@ -4,9 +4,11 @@
  *
  */
 
-#include "proxy.h"
-#include "qemu/log.h"
 #include "qemu/osdep.h"
+#include "qemu/log.h"
+#include "sysemu/sysemu.h"
+#include "proxy.h"
+#include "pnvl.h"
 
 /* ============================================================================
  * Private
@@ -17,7 +19,7 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 {
 	int ret;
 	PNVLProxy *proxy = &dev->proxy;
-	socklen_t len; /* not used again */
+	socklen_t len;
 
 	ret = bind(proxy->server.sockd, (struct sockaddr *)&proxy->server.addr,
 		sizeof(proxy->server.addr));
@@ -33,8 +35,8 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 	}
 
 	len = sizeof(proxy->client.addr);
-	con = accept(proxy->client.sockd,
-		(struct sockaddr *)&proxy->client.addr, &len);
+	proxy->client.sockd = accept(proxy->server.sockd,
+			(struct sockaddr *)&proxy->client.addr, &len);
 	if (ret < 0) {
 		perror("accept");
 		return;
@@ -52,7 +54,8 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 	PNVLProxy *proxy = &dev->proxy;
 
 	ret = connect(proxy->server.sockd,
-		(struct sockaddr *)&proxy->server.addr, sizeof(proxy->addr));
+			(struct sockaddr *)&proxy->server.addr,
+			sizeof(proxy->server.addr));
 	if (ret < 0) {
 		perror("connect");
 		return;
@@ -72,7 +75,7 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 {
 	int ret, con;
-	ProxyRequest req = PNVL_REQ_NONE;
+	ProxyRequest req = PNVL_REQ_NIL;
 	fd_set cons;
 
 	if (dev->proxy.server_mode)
@@ -107,16 +110,25 @@ int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req)
 
 int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 {
+	int con;
+
+	if (dev->proxy.server_mode)
+		con = dev->proxy.client.sockd;
+	else
+		con = dev->proxy.server.sockd;
+
 	switch(req) {
 	case PNVL_REQ_SYN:
-		return pnvl_transfer_pages(dev);
+		pnvl_execute(dev);
+		break;
 	case PNVL_REQ_RST:
 		qmp_system_reset(NULL); /* see qemu/ui/gtk.c L1313 */
 		break;
 	case PNVL_REQ_ALN:
-		return recv(dev->proxy.sockd, &dev->dma.config.len_avail,
-			sizeof(dev->dma.config.len_avail), 0);
+		return recv(con, &dev->dma.config.len_avail,
+				sizeof(dev->dma.config.len_avail), 0);
 	case PNVL_REQ_ACK:
+		printf("ACK (%d) recibido\n", req);
 		break;
 	default:
 		return PNVL_FAILURE;
@@ -191,7 +203,7 @@ void pnvl_proxy_reset(PNVLDevice *dev)
 void pnvl_proxy_init(PNVLDevice *dev, Error **errp)
 {
 	PNVLProxy *proxy = &dev->proxy;
-	struct hostent *h; /* not used again */
+	struct hostent *h;
 
 	h = gethostbyname(PNVL_PROXY_HOST);
 	if (!h) {
@@ -208,7 +220,7 @@ void pnvl_proxy_init(PNVLDevice *dev, Error **errp)
 	bzero(&proxy->server.addr, sizeof(proxy->server.addr));
 	proxy->server.addr.sin_family = AF_INET;
 	proxy->server.addr.sin_port = htons(proxy->port);
-	proxy->server.addr.sin_addr = *(in_addr_t *)h->h_addr_list[0];
+	proxy->server.addr.sin_addr.s_addr = *(in_addr_t *)h->h_addr_list[0];
 
 	if (proxy->server_mode)
 		pnvl_proxy_init_server(dev);

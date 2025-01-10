@@ -7,13 +7,13 @@
 #ifndef PNVL_H
 #define PNVL_H
 
-#include "dma.h"
+#include "qemu/osdep.h"
 #include "hw/pci/pci.h"
 #include "hw/pci/pci_device.h"
-#include "irq.h"
 #include "pnvl_hw.h"
+#include "dma.h"
+#include "irq.h"
 #include "proxy.h"
-#include "qemu/osdep.h"
 
 #define TYPE_PNVL_DEVICE "pnvl"
 #define PNVL_DEVICE_DESC "Proto-NVLink Device"

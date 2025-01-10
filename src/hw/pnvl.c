@@ -4,11 +4,11 @@
  *
  */
 
+#include "pnvl.h"
+#include "pnvl_hw.h"
 #include "dma.h"
 #include "irq.h"
 #include "mmio.h"
-#include "pnvl.h"
-#include "pnvl_hw.h"
 #include "proxy.h"
 #include "qom/object.h"
 

@@ -7,8 +7,8 @@
 #ifndef PNVL_IRQ_H
 #define PNVL_IRQ_H
 
-#include "hw/pci/pci.h"
 #include "qemu/osdep.h"
+#include "hw/pci/pci.h"
 
 /* Forward declaration */
 typedef struct PNVLDevice PNVLDevice;
