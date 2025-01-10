@@ -5,10 +5,10 @@
  */
 
 #include "qemu/osdep.h"
+#include "exec/target_page.h"
 #include "qemu/log.h"
 #include "pnvl.h"
 #include "dma.h"
-//#include <sys/param.h>
 
 /* ============================================================================
  * Private
@@ -140,9 +140,9 @@ void pnvl_dma_reset(PNVLDevice *dev)
 	dma->status = DMA_STATUS_IDLE;
 	dma->config.npages = 0;
 	dma->config.len = 0;
-	dma->config.page_size = getpagesize();
+	dma->config.page_size = qemu_target_page_size();
 	memset(dma->config.handles, 0,
-			dma->config.page_size * PNVL_HW_BAR0_DMA_HANDLES_CNT);
+			sizeof(dma_addr_t) * PNVL_HW_BAR0_DMA_HANDLES_CNT);
 	memset(dma->buff, 0, PNVL_HW_DMA_AREA_SIZE);
 }
 
