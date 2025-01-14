@@ -6,9 +6,9 @@
 
 #include "qemu/osdep.h"
 #include "qemu/log.h"
-#include "sysemu/sysemu.h"
 #include "proxy.h"
 #include "pnvl.h"
+#include "qapi/qapi-commands-machine.h"
 
 /* ============================================================================
  * Private
@@ -44,7 +44,13 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 		return;
 	}
 
+	/* Start test */
+	puts("PING");
 	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
+	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+	puts("PONG");
+	pnvl_proxy_issue_req(dev, PNVL_REQ_RST);
+	/* End test */
 
 	close(proxy->client.sockd);
 	close(proxy->server.sockd);
@@ -63,8 +69,13 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 		return;
 	}
 
-	ProxyRequest req = pnvl_proxy_wait_req(dev);
-	pnvl_proxy_handle_req(dev, req);
+	/* Start test */
+	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+	puts("PONG");
+	puts("PING");
+	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
+	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+	/* End test */
 
 	close(proxy->server.sockd);
 }

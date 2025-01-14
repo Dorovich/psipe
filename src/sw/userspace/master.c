@@ -1,25 +1,32 @@
-/* work.c - Userspace program to test the device (offload operation)
+/* master.c - Userspace program to test the device (offload operation)
  *
  * Author: David Cañadas López <dcanadas@bsc.es>
  *
  */
 
-#include "hw/pnvl_hw.h"
-#include "pnvl_util.h"
-#include "sw/module/pnvl_ioctl.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "hw/pnvl_hw.h"
+#include "sw/module/pnvl_ioctl.h"
+#include "pnvl_util.h"
 
-static int ioctl_pnvl_work(struct context *ctx, void *addr, size_t len)
+static int offload_work(struct context *ctx, void *addr, size_t len)
 {
 	int ret;
 	struct pnvl_data data;
 
-	data.in_addr = (unsigned long)addr;
-	data.in_len = (unsigned long)len;
+	data.addr = (unsigned long)addr;
+	data.len = (unsigned long)len;
+
+	puts("Reading initial data...");
+
+	for (int i = 0; i < data.len/sizeof(int); ++i)
+		printf("data[%d] =\t%d\n", i, ((int *)data.addr)[i]);
+
+	puts("Sending data...");
 
 	ret = ioctl(ctx->fd, PNVL_IOCTL_WORK, &data);
 	if (ret < 0) {
@@ -27,14 +34,18 @@ static int ioctl_pnvl_work(struct context *ctx, void *addr, size_t len)
 		return -1;
 	}
 
+	puts("Data sent! Waiting results...");
+
 	ret = ioctl(ctx->fd, PNVL_IOCTL_WAIT, NULL);
 	if (ret < 0) {
 		perror("PNVL_IOCTL_WAIT failed!");
 		return -1;
 	}
 
-	for (int i = 0; i < data.out_len/sizeof(int); ++i)
-		printf("data[%d] =\t%d\n", i, ((int *)data.out_addr)[i]);
+	puts("Results received! Reading results...");
+
+	for (int i = 0; i < data.len/sizeof(int); ++i)
+		printf("data[%d] =\t%d\n", i, ((int *)data.addr)[i]);
 
 	return 0;
 }
@@ -45,7 +56,7 @@ int main(int argc, char **argv)
 	int *data;
 	size_t len, data_len;
 
-	if (open_pnvl_dev(&ctx) == -1)
+	if (open_pnvl_dev(&ctx) < 0)
 		return -1;
 
 	len = 10;
@@ -53,7 +64,7 @@ int main(int argc, char **argv)
 	data = malloc(data_len);
 	bzero(data, data_len);
 
-	if (ioctl_pnvl_work(&ctx, data, data_len)) {
+	if (offload_work(&ctx, data, data_len)) {
 		close(ctx.fd);
 		return -1;
 	}

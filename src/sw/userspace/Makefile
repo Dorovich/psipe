@@ -5,7 +5,7 @@ build_dir := build/
 include_dir := $(abspath ../../../include/)
 includes := $(addprefix -I, $(include_dir))
 cflags := -Wall -Werror -O2 $(includes)
-targets := work watch
+targets := master chiplet
 util := $(build_dir)pnvl_util.o
 
 .PHONY : all
