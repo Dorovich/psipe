@@ -10,14 +10,26 @@
 #include "qemu/osdep.h"
 #include "hw/pci/pci.h"
 
+#define PNVL_IRQ_MAX_VECS 4
+
 /* Forward declaration */
 typedef struct PNVLDevice PNVLDevice;
+
+typedef struct MSIVector {
+	PNVLDevice *dev;
+	bool raised;
+} MSIVector;
+
+typedef struct IRQStatusMSI {
+	MSIVector msi_vectors[PNVL_IRQ_MAX_VECS];
+} IRQStatusMSI;
 
 typedef struct IRQStatusPin {
 	bool raised;
 } IRQStatusPin;
 
-typedef struct IRQStatus {
+typedef union IRQStatus {
+	IRQStatusMSI msi;
 	IRQStatusPin pin;
 } IRQStatus;
 
@@ -26,8 +38,8 @@ typedef struct IRQStatus {
  * ============================================================================
  */
 
-void pnvl_irq_raise(PNVLDevice *dev, unsigned int pin);
-void pnvl_irq_lower(PNVLDevice *dev, unsigned int pin);
+void pnvl_irq_raise(PNVLDevice *dev, unsigned int vector);
+void pnvl_irq_lower(PNVLDevice *dev, unsigned int vector);
 
 void pnvl_irq_reset(PNVLDevice *dev);
 void pnvl_irq_init(PNVLDevice *dev, Error **errp);

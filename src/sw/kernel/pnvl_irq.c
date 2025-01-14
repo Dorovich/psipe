@@ -29,15 +29,16 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static int pnvl_irq_enable_intx(struct pnvl_dev *pnvl_dev)
+static int pnvl_irq_enable_vectors(struct pnvl_dev *pnvl_dev)
 {
-	int irq_vecs_req, irq_vecs, err;
+	int irq_vecs_req, irq_vecs, err = 0;
 
-	err = 0;
 	irq_vecs_req = min_t(int, pci_msi_vec_count(pnvl_dev->pdev),
 			     num_online_cpus() + 1);
 	irq_vecs = pci_alloc_irq_vectors(pnvl_dev->pdev, 1,
 					 irq_vecs_req, PCI_IRQ_INTX);
+
+	printk("irq_vecs_req = %d\nirq_vecs = %d\n", irq_vecs_req, irq_vecs);
 
 	if (irq_vecs < 0)
 		return -ENOSPC;
@@ -46,8 +47,8 @@ static int pnvl_irq_enable_intx(struct pnvl_dev *pnvl_dev)
 		goto err_clean_irqs;
 	}
 
-	pnvl_dev->irq.irq_num = pci_irq_vector(
-		pnvl_dev->pdev, PNVL_HW_IRQ_WORK_ENDED_VECTOR);
+	pnvl_dev->irq.irq_num = pci_irq_vector(pnvl_dev->pdev,
+			PNVL_HW_IRQ_WORK_ENDED_VECTOR);
 	if (pnvl_dev->irq.irq_num < 0) {
 		err = -EINVAL;
 		goto err_clean_irqs;
@@ -70,5 +71,7 @@ err_clean_irqs:
 
 int pnvl_irq_enable(struct pnvl_dev *pnvl_dev)
 {
-	return pnvl_irq_enable_intx(pnvl_dev);
+	if (!pci_msi_enabled())
+		return -1;
+	return pnvl_irq_enable_vectors(pnvl_dev);
 }
