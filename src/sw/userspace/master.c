@@ -6,7 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include "hw/pnvl_hw.h"
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 	len = 10;
 	data_len = len * sizeof(int);
 	data = malloc(data_len);
-	bzero(data, data_len);
+	memset(data, 0, data_len);
 
 	if (offload_work(&ctx, data, data_len)) {
 		close(ctx.fd);
