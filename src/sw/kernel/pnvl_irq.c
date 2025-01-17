@@ -38,8 +38,6 @@ static int pnvl_irq_enable_vectors(struct pnvl_dev *pnvl_dev)
 	irq_vecs = pci_alloc_irq_vectors(pnvl_dev->pdev, 1,
 					 irq_vecs_req, PCI_IRQ_INTX);
 
-	printk("irq_vecs_req = %d\nirq_vecs = %d\n", irq_vecs_req, irq_vecs);
-
 	if (irq_vecs < 0)
 		return -ENOSPC;
 	if (irq_vecs != irq_vecs_req) {

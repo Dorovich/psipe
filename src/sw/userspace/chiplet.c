@@ -13,18 +13,35 @@
 #include "sw/module/pnvl_ioctl.h"
 #include "pnvl_util.h"
 
-static int handle_work(struct context *ctx, void *addr, size_t len)
+/*
+static int handle_work_short(int fd, void *addr, size_t len)
 {
-	int ret;
-	struct pnvl_data data;
+	struct pnvl_data data = {
+		.addr = (unsigned long)addr,
+		.len = (unsigned long)len,
+	};
 
-	data.addr = (unsigned long)addr;
-	data.len = (unsigned long)len;
+	ioctl(fd, PNVL_IOCTL_WAIT, &data);
+
+	for (int i = 0; i < data.len/sizeof(int); ++i)
+		((int *)data.addr)[i] = i;
+
+	ioctl(fd, PNVL_IOCTL_WORK, &data);
+
+	return 0;
+}
+*/
+
+static int handle_work(int fd, void *addr, size_t len)
+{
+	struct pnvl_data data = {
+		.addr = (unsigned long)addr,
+		.len = (unsigned long)len,
+	};
 
 	puts("Waiting for data...");
 
-	ret = ioctl(ctx->fd, PNVL_IOCTL_WAIT, &data);
-	if (ret < 0) {
+	if (ioctl(fd, PNVL_IOCTL_WAIT, &data) < 0) {
 		perror("PNVL_IOCTL_WAIT failed!");
 		return -1;
 	}
@@ -36,8 +53,7 @@ static int handle_work(struct context *ctx, void *addr, size_t len)
 
 	puts("Data processed. Sending results...");
 
-	ret = ioctl(ctx->fd, PNVL_IOCTL_WORK, &data);
-	if (ret < 0) {
+	if (ioctl(fd, PNVL_IOCTL_WORK, &data) < 0) {
 		perror("PNVL_IOCTL_WORK failed!");
 		return -1;
 	}
@@ -61,7 +77,7 @@ int main(int argc, char **argv)
 	data = malloc(data_len);
 	memset(data, 0, data_len);
 
-	if (handle_work(&ctx, data, data_len)) {
+	if (handle_work(ctx.fd, data, data_len)) {
 		close(ctx.fd);
 		return -1;
 	}

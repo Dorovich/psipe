@@ -23,3 +23,6 @@ compile_commands.json
 # build folders
 build/
 /src/hw/pnvl_hw.h
+
+# kernel source
+linux-6.6.72/

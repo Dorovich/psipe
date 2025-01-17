@@ -76,13 +76,10 @@ static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
 	struct pnvl_data __user *udata = (struct pnvl_data *)arg;
-	unsigned long len;
 
 	if (!udata && !pnvl_dev->data.addr)
 		return -EINVAL;
-	len = copy_from_user(&pnvl_dev->data, udata, sizeof(pnvl_dev->data));
-	if (len < sizeof(pnvl_dev->data))
-		return -EINVAL;
+	copy_from_user(&pnvl_dev->data, udata, sizeof(pnvl_dev->data));
 
 	switch(cmd) {
 	case PNVL_IOCTL_WORK:
