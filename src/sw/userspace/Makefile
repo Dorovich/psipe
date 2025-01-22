@@ -4,7 +4,7 @@ KNORM := "\e[0m"
 build_dir := build/
 include_dir := $(abspath ../../../include/)
 includes := $(addprefix -I, $(include_dir))
-cflags := -Wall -Werror -O2 $(includes)
+cflags := -static -static-libgcc -Wall -Werror -O2 $(includes)
 targets := master chiplet
 util := $(build_dir)pnvl_util.o
 
@@ -17,7 +17,7 @@ $(build_dir)%.o : %.c Makefile | $(build_dir)
 
 $(targets): %: $(build_dir)%.o $(util)
 	@printf $(KBLUE)"---- linking $@ ----\n"$(KNORM)
-	$(CC) -o $@ $(util) $<
+	$(CC) $(cflags) -o $@ $(util) $<
 
 $(build_dir):
 	@printf $(KBLUE)"---- create $@ dir ----\n"$(KNORM)

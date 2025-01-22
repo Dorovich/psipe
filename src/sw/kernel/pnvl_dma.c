@@ -12,15 +12,21 @@ static bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
 	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
-	return pnvl_dev->data.len > len_avail;
+	return pnvl_dev->data.len <= len_avail;
+}
+
+static void pvnl_dma_set_size_avail(struct pnvl_dev *pnvl_dev)
+{
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	size_t len_avail = pnvl_dev->data.len;
+	iowrite32(len_avail, mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 }
 
 static int pnvl_dma_setup_pages(struct pnvl_dev *pnvl_dev)
 {
-	int first_page, last_page, npages, npages_pinned;
+	int first_page, last_page, npages, npages_pinned = 0;
 	struct pnvl_data *data = &pnvl_dev->data;
 
-	npages_pinned = 0;
 	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
 	last_page = ((data->addr + data->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	npages = last_page - first_page + 1;
@@ -103,8 +109,17 @@ int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, int mode)
 {
 	int ret;
 
-	if (!pnvl_dma_check_size_avail(pnvl_dev))
-		return -ENOSPC;
+	switch(mode) {
+	case PNVL_MODE_PASSIVE:
+		pvnl_dma_set_size_avail(pnvl_dev);
+		break;
+	case PNVL_MODE_ACTIVE:
+		if (!pnvl_dma_check_size_avail(pnvl_dev))
+			return -ENOSPC;
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
 	pnvl_dev->dma.mode = mode;

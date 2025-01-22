@@ -20,6 +20,8 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 	dev_dbg(&pnvl_dev->pdev->dev, "irq_handler irq = %d dev = %d\n", irq,
 		pnvl_dev->major);
 
+	printk(KERN_DEBUG "pnvl interrupt received - handling\n");
+
 	pnvl_dev->running = false;
 
 	pnvl_dma_dismantle(pnvl_dev);
@@ -36,7 +38,7 @@ static int pnvl_irq_enable_vectors(struct pnvl_dev *pnvl_dev)
 	irq_vecs_req = min_t(int, pci_msi_vec_count(pnvl_dev->pdev),
 			     num_online_cpus() + 1);
 	irq_vecs = pci_alloc_irq_vectors(pnvl_dev->pdev, 1,
-					 irq_vecs_req, PCI_IRQ_INTX);
+					 irq_vecs_req, PCI_IRQ_ALL_TYPES);
 
 	if (irq_vecs < 0)
 		return -ENOSPC;
