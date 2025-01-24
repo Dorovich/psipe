@@ -67,6 +67,7 @@ static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 		if (ret < 0)
 			return ret;
 	}
+	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
 
 	return 0;

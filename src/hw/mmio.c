@@ -47,6 +47,13 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 		val = dev->dma.mode;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL:
+		if (dev->dma.mode == DMA_MODE_ACTIVE) {
+			pnvl_proxy_issue_req(dev, PNVL_REQ_SLN);
+			puts("Waiting for RLN...");
+			pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+			printf("Available length recv'd (%lu).\n",
+					dev->dma.config.len_avail);
+		}
 		val = dev->dma.config.len_avail;
 		break;
 	}
@@ -90,6 +97,7 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 		break;
 	default: /* DMA handles area */
 		dma->config.handles[pnvl_mmio_handle_pos(addr)] = val;
+		printf("Handle escrito: %lu @ %lu\n", val, addr);
 		break;
 	}
 }

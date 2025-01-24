@@ -141,11 +141,13 @@ void pnvl_execute(PNVLDevice *dev)
 {
 	switch(dev->dma.mode) {
 	case DMA_MODE_ACTIVE:
-		pnvl_proxy_issue_req(dev, PNVL_REQ_ALN);
 		pnvl_transfer_pages(dev);
 		break;
 	case DMA_MODE_PASSIVE:
+		puts("Waiting for SLN...");
 		pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+		printf("Available length sent (%lu).\n",
+				dev->dma.config.len_avail);
 		pnvl_receive_pages(dev);
 		break;
 	}

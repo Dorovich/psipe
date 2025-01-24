@@ -17,10 +17,11 @@
 #define PNVL_PROXY_MAXQ 1
 
 #define PNVL_REQ_NIL 0x0
-#define PNVL_REQ_ACK 0x1 /* any acknowledge */
-#define PNVL_REQ_SYN 0x2 /* sync page data */
+#define PNVL_REQ_ACK 0x1 /* general acknowledge */
+#define PNVL_REQ_SYN 0x2 /* start syncing page data */
 #define PNVL_REQ_RST 0x3 /* reset machine */
-#define PNVL_REQ_ALN 0x4 /* sync available length */
+#define PNVL_REQ_SLN 0x4 /* send your available length */
+#define PNVL_REQ_RLN 0x5 /* receive my available length */
 
 /* Forward declaration */
 typedef struct PNVLDevice PNVLDevice;

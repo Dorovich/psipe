@@ -51,9 +51,6 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 	puts("PONG");
 	pnvl_proxy_issue_req(dev, PNVL_REQ_RST);
 	/* End test */
-
-	close(proxy->client.sockd);
-	close(proxy->server.sockd);
 }
 
 static void pnvl_proxy_init_client(PNVLDevice *dev)
@@ -76,8 +73,6 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
 	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
 	/* End test */
-
-	close(proxy->server.sockd);
 }
 
 /* ============================================================================
@@ -137,9 +132,15 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 	case PNVL_REQ_RST:
 		qmp_system_reset(NULL); /* see qemu/ui/gtk.c L1313 */
 		break;
-	case PNVL_REQ_ALN:
-		return recv(con, &dev->dma.config.len_avail,
+	case PNVL_REQ_SLN:
+		pnvl_proxy_issue_req(dev, PNVL_REQ_RLN);
+		send(con, &dev->dma.config.len_avail,
 				sizeof(dev->dma.config.len_avail), 0);
+		break;
+	case PNVL_REQ_RLN:
+		recv(con, &dev->dma.config.len_avail,
+				sizeof(dev->dma.config.len_avail), 0);
+		break;
 	case PNVL_REQ_ACK:
 		printf("ACK (%d) recibido\n", req);
 		break;
@@ -243,5 +244,8 @@ void pnvl_proxy_init(PNVLDevice *dev, Error **errp)
 
 void pnvl_proxy_fini(PNVLDevice *dev)
 {
+	if (dev->proxy.server_mode)
+		close(dev->proxy.client.sockd);
+	close(dev->proxy.server.sockd);
 	return;
 }
