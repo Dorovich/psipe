@@ -56,8 +56,13 @@ struct pnvl_dev {
 };
 
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
-int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, int mode);
+
+int pnvl_dma_setup(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev);
+
+void pnvl_dma_mode_active(struct pnvl_dev *pnvl_dev);
+void pnvl_dma_mode_passive(struct pnvl_dev *pnvl_dev);
+
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wake(struct pnvl_dev *pnvl_dev);
 

@@ -43,33 +43,41 @@ static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
 size_t pnvl_dma_rx_page(PNVLDevice *dev)
 {
 	int err;
-	size_t ofs, len, len_max;
+	size_t ofs, max_page, len = 0;
 	unsigned long mask;
 	DMAEngine *dma = &dev->dma;
+	dma_addr_t addr = dma->current.addr;
+	size_t len_left = dma->current.len_left;
 
 	mask = pnvl_dma_mask(dev, dma->config.page_size - 1);
-	ofs = dma->current.addr & mask;
+	ofs = addr & mask;
+	max_page = dma->config.page_size - ofs;
 
-	len_max = MIN(dma->current.len_left, dma->config.page_size);
-	len = len_max - ofs;
-	err = pci_dma_read(&dev->pci_dev, dma->current.addr, dma->buff, len);
+	len = MIN(len_left, max_page);
+	printf("DMA_RX: len=%lu, ofs=%lu, max=%lu\n", len, ofs, max_page);
+	err = pci_dma_read(&dev->pci_dev, addr, dma->buff, len);
 	if (err)
 		return PNVL_FAILURE;
-	dma->current.len_left -= len;
+	addr += len;
+	len_left -= len;
 
-	if (!ofs)
-		return len;
+	if (!len_left)
+		goto dma_rx_end;
 
-	dma->current.hnd_pos++;
-	dma->current.addr = dma->config.handles[dma->current.hnd_pos];
-	err = pci_dma_read(&dev->pci_dev, dma->current.addr,
-			dma->buff + len, ofs);
+	addr = dma->config.handles[++dma->current.hnd_pos];
+	ofs = dma->config.page_size - len;
+	printf("DMA_RX: len=%lu, ofs=%lu, max=%lu\n", len, ofs, max_page);
+	err = pci_dma_read(&dev->pci_dev, addr, dma->buff + len, ofs);
 	if (err)
 		return PNVL_FAILURE;
-	dma->current.addr += ofs;
-	dma->current.len_left -= ofs;
+	addr += ofs;
+	len_left -= ofs;
 
-	return len_max;
+dma_rx_end:
+	dma->current.addr = addr;
+	dma->current.len_left = len_left;
+	printf("DMA_RX: len=%lu, len_left=%lu\n", len, len_left);
+	return len;
 }
 
 /*
@@ -77,44 +85,51 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev)
  */
 int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in)
 {
-	int err, len;
-	size_t ofs, len_max;
+	int err;
+	size_t ofs, max_page, len = 0;
 	unsigned long mask;
 	DMAEngine *dma = &dev->dma;
-
-	if (len_in <= 0)
-		return PNVL_FAILURE;
+	dma_addr_t addr = dma->current.addr;
+	size_t len_left = dma->current.len_left;
 
 	mask = pnvl_dma_mask(dev, dma->config.page_size - 1);
-	ofs = dma->current.addr & mask;
+	ofs = addr & mask;
+	max_page = dma->config.page_size - ofs;
 
-	len_max = MIN(dma->current.len_left, dma->config.page_size);
-	len = MIN(len_in, len_max) - ofs;
-	err = pci_dma_write(&dev->pci_dev, dma->current.addr, dma->buff, len);
+	len = MIN(len_in, max_page);
+	printf("DMA_TX: len=%lu, ofs=%lu, max=%lu\n", len, ofs, max_page);
+	err = pci_dma_write(&dev->pci_dev, addr, dma->buff, len);
 	if (err)
 		return PNVL_FAILURE;
-	dma->current.len_left -= len;
+	addr += len;
+	len_left -= len;
 
-	if (!ofs)
-		return PNVL_SUCCESS;
+	if (len == len_in)
+		goto dma_tx_end;
 
-	dma->current.hnd_pos++;
-	dma->current.addr = dma->config.handles[dma->current.hnd_pos];
-	err = pci_dma_read(&dev->pci_dev, dma->current.addr,
-			dma->buff + len, ofs);
+	addr = dma->config.handles[++dma->current.hnd_pos];
+	ofs = len_in - len; // because max_page < len_in
+	printf("DMA_TX: len=%lu, ofs=%lu, max=%lu\n", len, ofs, max_page);
+	err = pci_dma_write(&dev->pci_dev, addr, dma->buff + len, ofs);
 	if (err)
 		return PNVL_FAILURE;
-	dma->current.addr += ofs;
-	dma->current.len_left -= ofs;
+	addr += ofs;
+	len_left -= ofs;
 
+dma_tx_end:
+	dma->current.addr = addr;
+	dma->current.len_left = len_left;
+	printf("DMA_TX: len=%lu\n", len);
 	return PNVL_SUCCESS;
 }
 
 void pnvl_dma_init_current(PNVLDevice *dev)
 {
-	dev->dma.current.len_left = dev->dma.config.len;
-	dev->dma.current.addr = 0;
-	dev->dma.current.hnd_pos = 0;
+	DMAEngine *dma = &dev->dma;
+
+	dma->current.len_left = dma->config.len;
+	dma->current.addr = dma->config.handles[0];
+	dma->current.hnd_pos = 0;
 }
 
 void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)

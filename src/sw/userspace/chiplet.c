@@ -13,25 +13,6 @@
 #include "sw/module/pnvl_ioctl.h"
 #include "pnvl_util.h"
 
-/*
-static int handle_work_short(int fd, void *addr, size_t len)
-{
-	struct pnvl_data data = {
-		.addr = (unsigned long)addr,
-		.len = (unsigned long)len,
-	};
-
-	ioctl(fd, PNVL_IOCTL_WAIT, &data);
-
-	for (int i = 0; i < data.len/sizeof(int); ++i)
-		((int *)data.addr)[i] = i;
-
-	ioctl(fd, PNVL_IOCTL_WORK, &data);
-
-	return 0;
-}
-*/
-
 static int handle_work(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {

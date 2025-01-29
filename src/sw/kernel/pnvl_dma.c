@@ -102,17 +102,25 @@ void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
 	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
 }
 
-int pnvl_dma_setup(struct pnvl_dev *pnvl_dev, int mode)
+void pnvl_dma_mode_active(struct pnvl_dev *pnvl_dev)
+{
+	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
+	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
+}
+
+void pnvl_dma_mode_passive(struct pnvl_dev *pnvl_dev)
+{
+	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
+	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
+}
+
+int pnvl_dma_setup(struct pnvl_dev *pnvl_dev)
 {
 	int ret;
 
-	if (mode == PNVL_MODE_ACTIVE && !pnvl_dma_check_size_avail(pnvl_dev))
+	if(pnvl_dev->dma.mode == PNVL_MODE_ACTIVE
+			&& !pnvl_dma_check_size_avail(pnvl_dev))
 		return -ENOSPC;
-	else if (mode != PNVL_MODE_PASSIVE)
-		return -EINVAL;
-
-	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
-	pnvl_dev->dma.mode = mode;
 
 	ret = pnvl_dma_setup_pages(pnvl_dev);
 	if (ret < 0)
@@ -140,10 +148,8 @@ void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev)
 
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev)
 {
-	if (pnvl_dev->wq_flag)
-		return;
-
-	wait_event(pnvl_dev->wq, pnvl_dev->wq_flag == 1);
+	if (!pnvl_dev->wq_flag)
+		wait_event(pnvl_dev->wq, pnvl_dev->wq_flag == 1);
 	pnvl_dev->wq_flag = 0;
 }
 

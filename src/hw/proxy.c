@@ -45,11 +45,10 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 	}
 
 	/* Start test */
-	puts("PING");
 	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
 	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
-	puts("PONG");
 	pnvl_proxy_issue_req(dev, PNVL_REQ_RST);
+	puts("Client connection established.");
 	/* End test */
 }
 
@@ -68,11 +67,16 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 
 	/* Start test */
 	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
-	puts("PONG");
-	puts("PING");
 	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
 	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+	puts("Server connection established.");
 	/* End test */
+}
+
+static inline int pnvl_proxy_endpoint(PNVLDevice *dev)
+{
+	return (dev->proxy.server_mode ?
+			dev->proxy.client.sockd : dev->proxy.server.sockd);
 }
 
 /* ============================================================================
@@ -82,14 +86,10 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 
 ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 {
-	int ret, con;
+	int ret;
+	int con = pnvl_proxy_endpoint(dev);
 	ProxyRequest req = PNVL_REQ_NIL;
 	fd_set cons;
-
-	if (dev->proxy.server_mode)
-		con = dev->proxy.client.sockd;
-	else
-		con = dev->proxy.server.sockd;
 
 	FD_ZERO(&cons);
 	FD_SET(con, &cons);
@@ -102,12 +102,8 @@ ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 
 int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req)
 {
-	int ret, con;
-
-	if (dev->proxy.server_mode)
-		con = dev->proxy.client.sockd;
-	else
-		con = dev->proxy.server.sockd;
+	int ret;
+	int con = pnvl_proxy_endpoint(dev);
 
 	ret = send(con, &req, sizeof(req), 0);
 	if (ret < 0)
@@ -118,12 +114,7 @@ int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req)
 
 int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 {
-	int con;
-
-	if (dev->proxy.server_mode)
-		con = dev->proxy.client.sockd;
-	else
-		con = dev->proxy.server.sockd;
+	int con = pnvl_proxy_endpoint(dev);
 
 	switch(req) {
 	case PNVL_REQ_SYN:
@@ -141,6 +132,9 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 		recv(con, &dev->dma.config.len_avail,
 				sizeof(dev->dma.config.len_avail), 0);
 		break;
+	case PNVL_REQ_INT:
+		pnvl_irq_raise(dev, PNVL_HW_IRQ_WORK_ENDED_VECTOR);
+		break;
 	case PNVL_REQ_ACK:
 		printf("ACK (%d) recibido\n", req);
 		break;
@@ -156,11 +150,9 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
  */
 size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 {
-	int ret, src;
+	int ret;
+	int src = pnvl_proxy_endpoint(dev);
 	size_t len = 0;
-	PNVLProxy *proxy = &dev->proxy;
-
-	src = proxy->server_mode ? proxy->client.sockd : proxy->server.sockd;
 
 	ret = recv(src, &len, sizeof(len), 0);
 	if (ret < 0 || !len)
@@ -178,13 +170,11 @@ size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
  */
 int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len)
 {
-	int ret, dst;
-	PNVLProxy *proxy = &dev->proxy;
+	int ret;
+	int dst = pnvl_proxy_endpoint(dev);
 
 	if (len <= 0)
 		return PNVL_FAILURE;
-
-	dst = proxy->server_mode ? proxy->client.sockd : proxy->server.sockd;
 
 	ret = send(dst, &len, sizeof(len), 0);
 	if (ret < 0)
@@ -247,5 +237,4 @@ void pnvl_proxy_fini(PNVLDevice *dev)
 	if (dev->proxy.server_mode)
 		close(dev->proxy.client.sockd);
 	close(dev->proxy.server.sockd);
-	return;
 }
