@@ -41,6 +41,19 @@ static int pnvl_open(struct inode *inode, struct file *fp)
 	return 0;
 }
 
+static bool pnvl_copy_data(struct pnvl_dev *pnvl_dev, unsigned long arg)
+{
+	struct pnvl_data *kdata = &pnvl_dev->data;
+	struct pnvl_data __user *udata = (struct pnvl_data *)arg;
+
+	if (!access_ok(udata, sizeof(*udata)))
+		return false;
+	if (!copy_from_user(kdata, udata, sizeof(*kdata)))
+		return false;
+
+	return true;
+}
+
 static int pnvl_ioctl_work(struct pnvl_dev *pnvl_dev)
 {
 	int ret;
@@ -79,16 +92,8 @@ static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
-	struct pnvl_data __user *udata = (struct pnvl_data *)arg;
-	int ret;
 
-	if (!access_ok(udata, sizeof(*udata)))
-		return -EFAULT;
-	if (!udata && !pnvl_dev->data.addr)
-		return -EINVAL;
-
-	ret = copy_from_user(&pnvl_dev->data, udata, sizeof(pnvl_dev->data));
-	if (ret != 0)
+	if (!pnvl_copy_data(pnvl_dev, arg))
 		return -EFAULT;
 
 	switch(cmd) {
