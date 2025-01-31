@@ -132,9 +132,6 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 		recv(con, &dev->dma.config.len_avail,
 				sizeof(dev->dma.config.len_avail), 0);
 		break;
-	case PNVL_REQ_INT:
-		pnvl_irq_raise(dev, PNVL_HW_IRQ_WORK_ENDED_VECTOR);
-		break;
 	case PNVL_REQ_ACK:
 		printf("ACK (%d) recibido\n", req);
 		break;

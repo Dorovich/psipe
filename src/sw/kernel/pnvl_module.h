@@ -42,7 +42,8 @@ struct pnvl_irq {
 };
 
 struct pnvl_dev {
-	bool running;
+	bool sending; // PNVL_IOCTL_SEND in progress
+	bool recving; // PNVL_IOCTL_RECV in progress
 	int wq_flag;
 	wait_queue_head_t wq;
 	struct pci_dev *pdev;
@@ -55,14 +56,14 @@ struct pnvl_dev {
 	struct cdev cdev;
 };
 
+bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev);
+int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev);
+int pnvl_dma_get_handles(struct pnvl_dev *pnvl_dev);
+void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
-
-int pnvl_dma_setup(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev);
-
 void pnvl_dma_mode_active(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_mode_passive(struct pnvl_dev *pnvl_dev);
-
+void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wake(struct pnvl_dev *pnvl_dev);
 

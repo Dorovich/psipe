@@ -54,35 +54,67 @@ static bool pnvl_copy_data(struct pnvl_dev *pnvl_dev, unsigned long arg)
 	return true;
 }
 
-static int pnvl_ioctl_work(struct pnvl_dev *pnvl_dev)
+static int pnvl_ioctl_send(struct pnvl_dev *pnvl_dev, unsigned long arg)
 {
 	int ret;
 
-	if (pnvl_dev->running)
+	if (pnvl_dev->sending || pnvl_dev->recving)
 		return -EBUSY;
+	if (!pnvl_copy_data(pnvl_dev, arg))
+		return -EFAULT;
+	if(!pnvl_dma_check_size_avail(pnvl_dev))
+		return -EMSGSIZE;
 
 	pnvl_dma_mode_active(pnvl_dev);
-	ret = pnvl_dma_setup(pnvl_dev);
+	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
+		return -ENOMEM;
+	ret = pnvl_dma_get_handles(pnvl_dev);
 	if (ret < 0)
 		return ret;
+	pnvl_dma_write_params(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 
-	pnvl_dev->running = true;
+	return 0;
+}
+
+static int pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, unsigned long arg)
+{
+	int ret;
+
+	if (pnvl_dev->sending || pnvl_dev->recving)
+		return -EBUSY;
+	if (!pnvl_copy_data(pnvl_dev, arg))
+		return -EFAULT;
+
+	pnvl_dma_mode_passive(pnvl_dev);
+	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
+		return -ENOMEM;
+	ret = pnvl_dma_get_handles(pnvl_dev);
+	if (ret < 0)
+		return ret;
+	pnvl_dma_write_params(pnvl_dev);
+	pnvl_dma_doorbell_ring(pnvl_dev);
+	pnvl_dma_wait(pnvl_dev);
 
 	return 0;
 }
 
 static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 {
-	int ret;
+	if (!pnvl_dev->sending)
+		return -EINVAL;
 
-	if (pnvl_dev->running)
-		pnvl_dma_wait(pnvl_dev);
+	pnvl_dma_wait(pnvl_dev);
 
-	pnvl_dma_mode_passive(pnvl_dev);
-	ret = pnvl_dma_setup(pnvl_dev);
-	if (ret < 0)
-		return ret;
+	return 0;
+}
+
+static int pnvl_ioctl_return(struct pnvl_dev *pnvl_dev)
+{
+	if (!pnvl_dev->recving)
+		return -EINVAL;
+
+	pnvl_dma_mode_active(pnvl_dev); // a little trick, see pnvl_irq_handler
 	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
 
@@ -93,14 +125,15 @@ static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
 
-	if (!pnvl_copy_data(pnvl_dev, arg))
-		return -EFAULT;
-
 	switch(cmd) {
-	case PNVL_IOCTL_WORK:
-		return pnvl_ioctl_work(pnvl_dev);
+	case PNVL_IOCTL_SEND:
+		return pnvl_ioctl_send(pnvl_dev, arg);
+	case PNVL_IOCTL_RECV:
+		return pnvl_ioctl_recv(pnvl_dev, arg);
 	case PNVL_IOCTL_WAIT:
 		return pnvl_ioctl_wait(pnvl_dev);
+	case PNVL_IOCTL_RETURN:
+		return pnvl_ioctl_return(pnvl_dev);
 	default:
 		return -ENOTTY;
 	}
@@ -143,7 +176,10 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	pnvl_dev->wq_flag = 0;
 	init_waitqueue_head(&pnvl_dev->wq);
 
-	pnvl_dev->running = false;
+	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
+
+	pnvl_dev->sending = false;
+	pnvl_dev->recving = false;
 
 	return 0;
 }

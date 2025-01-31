@@ -152,6 +152,7 @@ bool pnvl_dma_is_finished(PNVLDevice *dev)
 void pnvl_dma_reset(PNVLDevice *dev)
 {
 	DMAEngine *dma = &dev->dma;
+	dev->dma.ret = false;
 	dma->status = DMA_STATUS_IDLE;
 	dma->config.npages = 0;
 	dma->config.len = 0;

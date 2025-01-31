@@ -8,14 +8,14 @@
 #include "pnvl_module.h"
 #include <linux/dma-mapping.h>
 
-static bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
+bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
 	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 	return pnvl_dev->data.len <= len_avail;
 }
 
-static int pnvl_dma_setup_pages(struct pnvl_dev *pnvl_dev)
+int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 {
 	int first_page, last_page, npages, npages_pinned = 0;
 	struct pnvl_data *data = &pnvl_dev->data;
@@ -33,7 +33,7 @@ static int pnvl_dma_setup_pages(struct pnvl_dev *pnvl_dev)
 	return npages_pinned - npages;
 }
 
-static int pnvl_dma_setup_handles(struct pnvl_dev *pnvl_dev)
+int pnvl_dma_get_handles(struct pnvl_dev *pnvl_dev)
 {
 	struct pci_dev *pdev = pnvl_dev->pdev;
 	struct pnvl_dma *dma = &pnvl_dev->dma;
@@ -74,7 +74,7 @@ err_dma_map:
 	return err;
 }
 
-static void pnvl_dma_setup_write_params(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	void __iomem *mmio = pnvl_dev->bar.mmio;
@@ -105,34 +105,15 @@ void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
 void pnvl_dma_mode_active(struct pnvl_dev *pnvl_dev)
 {
 	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
-	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
+	pnvl_dev->sending = true;
+	pnvl_dev->recving = false;
 }
 
 void pnvl_dma_mode_passive(struct pnvl_dev *pnvl_dev)
 {
 	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
-	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
-}
-
-int pnvl_dma_setup(struct pnvl_dev *pnvl_dev)
-{
-	int ret;
-
-	if(pnvl_dev->dma.mode == PNVL_MODE_ACTIVE
-			&& !pnvl_dma_check_size_avail(pnvl_dev))
-		return -ENOSPC;
-
-	ret = pnvl_dma_setup_pages(pnvl_dev);
-	if (ret < 0)
-		return ret;
-
-	ret = pnvl_dma_setup_handles(pnvl_dev);
-	if (ret < 0)
-		return ret;
-
-	pnvl_dma_setup_write_params(pnvl_dev);
-
-	return 0;
+	pnvl_dev->sending = false;
+	pnvl_dev->recving = true;
 }
 
 void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev)

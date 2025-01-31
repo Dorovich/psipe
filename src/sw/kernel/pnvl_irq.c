@@ -22,9 +22,11 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 
 	printk(KERN_DEBUG "pnvl interrupt received - handling\n");
 
-	pnvl_dev->running = false;
+	if (pnvl_dev->sending) {
+		pnvl_dma_dismantle(pnvl_dev);
+		pnvl_dev->sending = false;
+	}
 
-	pnvl_dma_dismantle(pnvl_dev);
 	pnvl_irq_ack(pnvl_dev);
 	pnvl_dma_wake(pnvl_dev);
 

@@ -27,14 +27,14 @@ static int offload_work(int fd, void *addr, size_t len)
 
 	puts("Sending data...");
 
-	if (ioctl(fd, PNVL_IOCTL_WORK, &data) < 0) {
-		perror("PNVL_IOCTL_WORK failed!");
+	if (ioctl(fd, PNVL_IOCTL_SEND, &data) < 0) {
+		perror("PNVL_IOCTL_SEND failed!");
 		return -1;
 	}
 
 	puts("Data sent! Waiting results...");
 
-	if (ioctl(fd, PNVL_IOCTL_WAIT, &data) < 0) {
+	if (ioctl(fd, PNVL_IOCTL_WAIT) < 0) {
 		perror("PNVL_IOCTL_WAIT failed!");
 		return -1;
 	}

@@ -22,8 +22,8 @@ static int handle_work(int fd, void *addr, size_t len)
 
 	puts("Waiting for data...");
 
-	if (ioctl(fd, PNVL_IOCTL_WAIT, &data) < 0) {
-		perror("PNVL_IOCTL_WAIT failed!");
+	if (ioctl(fd, PNVL_IOCTL_RECV, &data) < 0) {
+		perror("PNVL_IOCTL_RECV failed!");
 		return -1;
 	}
 
@@ -34,8 +34,8 @@ static int handle_work(int fd, void *addr, size_t len)
 
 	puts("Data processed. Sending results...");
 
-	if (ioctl(fd, PNVL_IOCTL_WORK, &data) < 0) {
-		perror("PNVL_IOCTL_WORK failed!");
+	if (ioctl(fd, PNVL_IOCTL_RETURN, &data) < 0) {
+		perror("PNVL_IOCTL_RETURN failed!");
 		return -1;
 	}
 
