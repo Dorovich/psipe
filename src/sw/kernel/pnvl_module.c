@@ -48,7 +48,7 @@ static bool pnvl_copy_data(struct pnvl_dev *pnvl_dev, unsigned long arg)
 
 	if (!access_ok(udata, sizeof(*udata)))
 		return false;
-	if (!copy_from_user(kdata, udata, sizeof(*kdata)))
+	if (copy_from_user(kdata, udata, sizeof(*kdata)) != 0)
 		return false;
 
 	return true;
@@ -95,6 +95,7 @@ static int pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, unsigned long arg)
 	pnvl_dma_write_params(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
+	pnvl_dma_dismantle(pnvl_dev);
 
 	return 0;
 }
@@ -105,6 +106,8 @@ static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 		return -EINVAL;
 
 	pnvl_dma_wait(pnvl_dev);
+	pnvl_dma_dismantle(pnvl_dev);
+	pnvl_dma_mode_off(pnvl_dev);
 
 	return 0;
 }
@@ -114,9 +117,11 @@ static int pnvl_ioctl_return(struct pnvl_dev *pnvl_dev)
 	if (!pnvl_dev->recving)
 		return -EINVAL;
 
-	pnvl_dma_mode_active(pnvl_dev); // a little trick, see pnvl_irq_handler
+	pnvl_dma_mode_active(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
+	pnvl_dma_dismantle(pnvl_dev);
+	pnvl_dma_mode_off(pnvl_dev);
 
 	return 0;
 }
@@ -177,6 +182,7 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	init_waitqueue_head(&pnvl_dev->wq);
 
 	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
+	pnvl_dev->dma.mode = -1;
 
 	pnvl_dev->sending = false;
 	pnvl_dev->recving = false;

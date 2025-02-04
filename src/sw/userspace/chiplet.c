@@ -13,6 +13,8 @@
 #include "sw/module/pnvl_ioctl.h"
 #include "pnvl_util.h"
 
+#define VEC_LEN 3000
+
 static int handle_work(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {
@@ -34,7 +36,7 @@ static int handle_work(int fd, void *addr, size_t len)
 
 	puts("Data processed. Sending results...");
 
-	if (ioctl(fd, PNVL_IOCTL_RETURN, &data) < 0) {
+	if (ioctl(fd, PNVL_IOCTL_RETURN) < 0) {
 		perror("PNVL_IOCTL_RETURN failed!");
 		return -1;
 	}
@@ -48,13 +50,12 @@ int main(int argc, char **argv)
 {
 	struct context ctx = parse_args(argc, argv);
 	int *data;
-	size_t len, data_len;
+	size_t data_len;
 
 	if (open_pnvl_dev(&ctx) < 0)
 		return -1;
 
-	len = 10;
-	data_len = len * sizeof(int);
+	data_len = VEC_LEN * sizeof(int);
 	data = malloc(data_len);
 	memset(data, 0, data_len);
 

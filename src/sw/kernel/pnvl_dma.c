@@ -116,6 +116,13 @@ void pnvl_dma_mode_passive(struct pnvl_dev *pnvl_dev)
 	pnvl_dev->recving = true;
 }
 
+void pnvl_dma_mode_off(struct pnvl_dev *pnvl_dev)
+{
+	pnvl_dev->dma.mode = -1;
+	pnvl_dev->sending = false;
+	pnvl_dev->recving = false;
+}
+
 void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;

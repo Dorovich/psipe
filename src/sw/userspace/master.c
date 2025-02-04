@@ -13,6 +13,8 @@
 #include "sw/module/pnvl_ioctl.h"
 #include "pnvl_util.h"
 
+#define VEC_LEN 3000
+
 static int offload_work(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {
@@ -20,10 +22,12 @@ static int offload_work(int fd, void *addr, size_t len)
 		.len = (unsigned long)len,
 	};
 
+	/*
 	puts("Reading initial data...");
 
 	for (int i = 0; i < data.len/sizeof(int); ++i)
 		printf("data[%d] =\t%d\n", i, ((int *)data.addr)[i]);
+	*/
 
 	puts("Sending data...");
 
@@ -39,10 +43,14 @@ static int offload_work(int fd, void *addr, size_t len)
 		return -1;
 	}
 
-	puts("Results received! Reading results...");
+	puts("Results received! Checking results...");
 
-	for (int i = 0; i < data.len/sizeof(int); ++i)
-		printf("data[%d] =\t%d\n", i, ((int *)data.addr)[i]);
+	int errcnt = 0;
+	for (int i = 0; i < data.len/sizeof(int); ++i) {
+		if (((int *)data.addr)[i] != i)
+			errcnt++;
+	}
+	printf("%d errors counted.\n", errcnt);
 
 	return 0;
 }
@@ -51,13 +59,12 @@ int main(int argc, char **argv)
 {
 	struct context ctx = parse_args(argc, argv);
 	int *data;
-	size_t len, data_len;
+	size_t data_len;
 
 	if (open_pnvl_dev(&ctx) < 0)
 		return -1;
 
-	len = 10;
-	data_len = len * sizeof(int);
+	data_len = VEC_LEN * sizeof(int);
 	data = malloc(data_len);
 	memset(data, 0, data_len);
 

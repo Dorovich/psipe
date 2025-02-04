@@ -63,6 +63,7 @@ void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_mode_active(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_mode_passive(struct pnvl_dev *pnvl_dev);
+void pnvl_dma_mode_off(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wake(struct pnvl_dev *pnvl_dev);

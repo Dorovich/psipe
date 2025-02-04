@@ -25,7 +25,7 @@ static inline bool pnvl_mmio_valid_access(hwaddr addr, unsigned int size)
 
 static inline int pnvl_mmio_handle_pos(hwaddr addr)
 {
-	return ((addr - PNVL_HW_BAR0_DMA_HANDLES) / sizeof(addr));
+	return ((addr - PNVL_HW_BAR0_DMA_HANDLES) / sizeof(uint32_t));
 }
 
 static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
@@ -49,7 +49,7 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 	case PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL:
 		if (dev->dma.mode == DMA_MODE_ACTIVE) {
 			pnvl_proxy_issue_req(dev, PNVL_REQ_SLN);
-			pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+			pnvl_proxy_wait_and_handle_req(dev);
 		}
 		val = dev->dma.config.len_avail;
 		break;
@@ -94,7 +94,8 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 		break;
 	default: /* DMA handles area */
 		dma->config.handles[pnvl_mmio_handle_pos(addr)] = val;
-		printf("New handle: %lu @ %lu\n", val, addr);
+		printf("New handle: %#010lx @ %#010lx (pos=%d)\n", val, addr,
+				pnvl_mmio_handle_pos(addr));
 		break;
 	}
 }

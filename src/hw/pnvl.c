@@ -24,6 +24,7 @@ static void pnvl_device_init(PCIDevice *pci_dev, Error **errp)
 	pnvl_dma_init(dev, errp);
 	pnvl_mmio_init(dev, errp);
 	pnvl_proxy_init(dev, errp);
+	dev->ret = false;
 }
 
 static void pnvl_device_fini(PCIDevice *pci_dev)
@@ -42,6 +43,7 @@ static void pnvl_device_reset(DeviceState *dev_st)
 	pnvl_dma_reset(dev);
 	pnvl_mmio_reset(dev);
 	pnvl_proxy_reset(dev);
+	dev->ret = false;
 }
 
 /* ============================================================================
@@ -114,12 +116,15 @@ static void pnvl_transfer_pages(PNVLDevice *dev)
 	size_t len;
 
 	pnvl_dma_init_current(dev);
+	printf("BEGIN pnvl_transfer_pages (len=%lu)\n",
+			dev->dma.current.len_left);
+
 	do {
 		len = pnvl_dma_rx_page(dev);
 		ret = pnvl_proxy_tx_page(dev, dev->dma.buff, len);
 	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
 
-	printf("DONE pnvl_transfer_pages (len=%lu, ret=%d)\n", len, ret);
+	printf("DONE pnvl_transfer_pages (ret=%d)\n", ret);
 }
 
 static void pnvl_receive_pages(PNVLDevice *dev)
@@ -128,12 +133,15 @@ static void pnvl_receive_pages(PNVLDevice *dev)
 	size_t len;
 
 	pnvl_dma_init_current(dev);
+	printf("BEGIN pnvl_receive_pages (len=%lu)\n",
+			dev->dma.current.len_left);
+
 	do {
 		len = pnvl_proxy_rx_page(dev, dev->dma.buff);
 		ret = pnvl_dma_tx_page(dev, len);
 	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
 
-	printf("DONE pnvl_receive_pages (len=%lu, ret=%d)\n", len, ret);
+	printf("DONE pnvl_receive_pages (ret=%d)\n", ret);
 }
 
 /* ============================================================================
@@ -146,17 +154,20 @@ void pnvl_execute(PNVLDevice *dev)
 	switch(dev->dma.mode) {
 	case DMA_MODE_ACTIVE:
 		pnvl_transfer_pages(dev);
-		//pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+		//pnvl_proxy_wait_and_handle_req(dev);
 		pnvl_receive_pages(dev);
+		if (dev->ret)
+			dev->ret = false;
 		break;
 	case DMA_MODE_PASSIVE:
-		if (!dev->dma.ret) {
-			pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+		if (!dev->ret) {
+			pnvl_proxy_wait_and_handle_req(dev);
 			pnvl_receive_pages(dev);
-			dev->dma.ret = true;
+			dev->ret = true;
 		} else {
+			//pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
 			pnvl_transfer_pages(dev);
-			dev->dma.ret = false;
+			dev->ret = false;
 		}
 		break;
 	}

@@ -46,7 +46,6 @@ typedef enum DMAMode {
 } DMAMode;
 
 typedef struct DMAEngine {
-	bool ret; // return results in passive mode
 	DMAConfig config;
 	DMACurrent current;
 	DMAStatus status;

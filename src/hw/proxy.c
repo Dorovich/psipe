@@ -34,7 +34,7 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 		return;
 	}
 
-	printf("Servidor iniciado, esperando cliente...\n");
+	printf("Server started, waiting for client...\n");
 
 	len = sizeof(proxy->client.addr);
 	proxy->client.sockd = accept(proxy->server.sockd,
@@ -46,7 +46,7 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 
 	/* Start test */
 	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
-	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+	pnvl_proxy_wait_and_handle_req(dev);
 	pnvl_proxy_issue_req(dev, PNVL_REQ_RST);
 	puts("Client connection established.");
 	/* End test */
@@ -66,9 +66,9 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 	}
 
 	/* Start test */
-	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+	pnvl_proxy_wait_and_handle_req(dev);
 	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
-	pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+	pnvl_proxy_wait_and_handle_req(dev);
 	puts("Server connection established.");
 	/* End test */
 }
@@ -79,12 +79,7 @@ static inline int pnvl_proxy_endpoint(PNVLDevice *dev)
 			dev->proxy.client.sockd : dev->proxy.server.sockd);
 }
 
-/* ============================================================================
- * Public
- * ============================================================================
- */
-
-ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
+static ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 {
 	int ret;
 	int con = pnvl_proxy_endpoint(dev);
@@ -100,19 +95,7 @@ ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 	return req;
 }
 
-int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req)
-{
-	int ret;
-	int con = pnvl_proxy_endpoint(dev);
-
-	ret = send(con, &req, sizeof(req), 0);
-	if (ret < 0)
-		return PNVL_FAILURE;
-
-	return PNVL_SUCCESS;
-}
-
-int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
+static int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 {
 	int con = pnvl_proxy_endpoint(dev);
 
@@ -133,13 +116,34 @@ int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 				sizeof(dev->dma.config.len_avail), 0);
 		break;
 	case PNVL_REQ_ACK:
-		printf("ACK (%d) recibido\n", req);
 		break;
 	default:
 		return PNVL_FAILURE;
 	}
 
 	return PNVL_SUCCESS;
+}
+
+/* ============================================================================
+ * Public
+ * ============================================================================
+ */
+
+int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req)
+{
+	int ret;
+	int con = pnvl_proxy_endpoint(dev);
+
+	ret = send(con, &req, sizeof(req), 0);
+	if (ret < 0)
+		return PNVL_FAILURE;
+
+	return PNVL_SUCCESS;
+}
+
+int pnvl_proxy_wait_and_handle_req(PNVLDevice *dev)
+{
+	return pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
 }
 
 /*

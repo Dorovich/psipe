@@ -32,6 +32,11 @@ static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
 		addr <= PNVL_HW_DMA_AREA_START + PNVL_HW_DMA_AREA_SIZE);
 }
 
+static inline dma_addr_t pnvl_dma_next_handle(DMAEngine *dma)
+{
+	return dma->config.handles[++dma->current.hnd_pos];
+}
+
 /* ============================================================================
  * Public
  * ============================================================================
@@ -42,42 +47,39 @@ static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
  */
 size_t pnvl_dma_rx_page(PNVLDevice *dev)
 {
-	int err;
-	size_t ofs, max_page, len = 0;
+	size_t ofs, len_want, len_have;
 	unsigned long mask;
 	DMAEngine *dma = &dev->dma;
 	dma_addr_t addr = dma->current.addr;
-	size_t len_left = dma->current.len_left;
 
 	mask = pnvl_dma_mask(dev, dma->config.page_size - 1);
 	ofs = addr & mask;
-	max_page = dma->config.page_size - ofs;
+	len_have = dma->config.page_size - ofs;
+	len_want = MIN(dma->config.page_size, dma->current.len_left);
 
-	len = MIN(len_left, max_page);
-	printf("DMA_RX: len=%lu, ofs=%lu, max=%lu\n", len, ofs, max_page);
-	err = pci_dma_read(&dev->pci_dev, addr, dma->buff, len);
-	if (err)
-		return PNVL_FAILURE;
-	addr += len;
-	len_left -= len;
+	if (len_want <= len_have) {
+		printf("DMA READ: %lu bytes @ %#010lx\n", len_want, addr);
+		if (pci_dma_read(&dev->pci_dev, addr, dma->buff, len_want))
+			return PNVL_FAILURE;
+		addr += len_want;
+	} else {
+		printf("DMA READ: %lu bytes @ %#010lx\n", len_have, addr);
+		if (pci_dma_read(&dev->pci_dev, addr, dma->buff, len_have))
+			return PNVL_FAILURE;
+		addr = pnvl_dma_next_handle(dma);
 
-	if (!len_left)
-		goto dma_rx_end;
+		size_t lofs = len_want - len_have;
+		printf("DMA READ: %lu bytes @ %#010lx\n", lofs, addr);
+		if (pci_dma_read(&dev->pci_dev, addr, dma->buff + len_have,
+					lofs))
+			return PNVL_FAILURE;
+		addr += lofs;
+	}
 
-	addr = dma->config.handles[++dma->current.hnd_pos];
-	ofs = dma->config.page_size - len;
-	printf("DMA_RX: len=%lu, ofs=%lu, max=%lu\n", len, ofs, max_page);
-	err = pci_dma_read(&dev->pci_dev, addr, dma->buff + len, ofs);
-	if (err)
-		return PNVL_FAILURE;
-	addr += ofs;
-	len_left -= ofs;
-
-dma_rx_end:
 	dma->current.addr = addr;
-	dma->current.len_left = len_left;
-	printf("DMA_RX: len=%lu, len_left=%lu\n", len, len_left);
-	return len;
+	dma->current.len_left -= len_want;
+	printf("DMA READ: %lu bytes left\n", dma->current.len_left);
+	return len_want;
 }
 
 /*
@@ -85,41 +87,38 @@ dma_rx_end:
  */
 int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in)
 {
-	int err;
-	size_t ofs, max_page, len = 0;
+	size_t ofs, len_want, len_have;
 	unsigned long mask;
 	DMAEngine *dma = &dev->dma;
 	dma_addr_t addr = dma->current.addr;
-	size_t len_left = dma->current.len_left;
 
 	mask = pnvl_dma_mask(dev, dma->config.page_size - 1);
 	ofs = addr & mask;
-	max_page = dma->config.page_size - ofs;
+	len_have = dma->config.page_size - ofs;
+	len_want = len_in;
 
-	len = MIN(len_in, max_page);
-	printf("DMA_TX: len=%lu, ofs=%lu, max=%lu\n", len, ofs, max_page);
-	err = pci_dma_write(&dev->pci_dev, addr, dma->buff, len);
-	if (err)
-		return PNVL_FAILURE;
-	addr += len;
-	len_left -= len;
+	if (len_want <= len_have) {
+		printf("DMA WRITE: %lu bytes @ %#010lx\n", len_want, addr);
+		if (pci_dma_write(&dev->pci_dev, addr, dma->buff, len_want))
+			return PNVL_FAILURE;
+		addr += len_want;
+	} else {
+		printf("DMA WRITE: %lu bytes @ %#010lx\n", len_have, addr);
+		if (pci_dma_write(&dev->pci_dev, addr, dma->buff, len_have))
+			return PNVL_FAILURE;
+		addr = pnvl_dma_next_handle(dma);
 
-	if (len == len_in)
-		goto dma_tx_end;
+		size_t lofs = len_want - len_have;
+		printf("DMA WRITE: %lu bytes @ %#010lx\n", lofs, addr);
+		if (pci_dma_write(&dev->pci_dev, addr, dma->buff + len_have,
+					lofs))
+			return PNVL_FAILURE;
+		addr += lofs;
+	}
 
-	addr = dma->config.handles[++dma->current.hnd_pos];
-	ofs = len_in - len; // because max_page < len_in
-	printf("DMA_TX: len=%lu, ofs=%lu, max=%lu\n", len, ofs, max_page);
-	err = pci_dma_write(&dev->pci_dev, addr, dma->buff + len, ofs);
-	if (err)
-		return PNVL_FAILURE;
-	addr += ofs;
-	len_left -= ofs;
-
-dma_tx_end:
 	dma->current.addr = addr;
-	dma->current.len_left = len_left;
-	printf("DMA_TX: len=%lu\n", len);
+	dma->current.len_left -= len_want;
+	printf("DMA WRITE: %lu bytes left\n", dma->current.len_left);
 	return PNVL_SUCCESS;
 }
 
@@ -152,7 +151,6 @@ bool pnvl_dma_is_finished(PNVLDevice *dev)
 void pnvl_dma_reset(PNVLDevice *dev)
 {
 	DMAEngine *dma = &dev->dma;
-	dev->dma.ret = false;
 	dma->status = DMA_STATUS_IDLE;
 	dma->config.npages = 0;
 	dma->config.len = 0;
