@@ -53,6 +53,7 @@ void pnvl_proxy_set_mode(Object *obj, bool mode, Error **errp);
 
 int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req);
 int pnvl_proxy_wait_and_handle_req(PNVLDevice *dev);
+int pnvl_proxy_await_req(PNVLDevice *dev, ProxyRequest req);
 
 void pnvl_proxy_reset(PNVLDevice *dev);
 void pnvl_proxy_init(PNVLDevice *dev, Error **errp);

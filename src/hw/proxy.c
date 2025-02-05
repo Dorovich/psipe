@@ -44,12 +44,17 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 		return;
 	}
 
-	/* Start test */
-	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
-	pnvl_proxy_wait_and_handle_req(dev);
-	pnvl_proxy_issue_req(dev, PNVL_REQ_RST);
+	/* Begin connection test */
+	if (pnvl_proxy_issue_req(dev, PNVL_REQ_ACK) != PNVL_SUCCESS) {
+		perror("pnvl_proxy_issue_req");
+		return;
+	}
+	if (pnvl_proxy_await_req(dev, PNVL_REQ_ACK) != PNVL_SUCCESS) {
+		perror("pnvl_proxy_await_req");
+		return;
+	}
 	puts("Client connection established.");
-	/* End test */
+	/* End connection test */
 }
 
 static void pnvl_proxy_init_client(PNVLDevice *dev)
@@ -65,12 +70,17 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 		return;
 	}
 
-	/* Start test */
-	pnvl_proxy_wait_and_handle_req(dev);
-	pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
-	pnvl_proxy_wait_and_handle_req(dev);
+	/* Begin connection test */
+	if (pnvl_proxy_await_req(dev, PNVL_REQ_ACK) != PNVL_SUCCESS) {
+		perror("pnvl_proxy_await_req");
+		return;
+	}
+	if (pnvl_proxy_issue_req(dev, PNVL_REQ_ACK) != PNVL_SUCCESS) {
+		perror("pnvl_proxy_issue_req");
+		return;
+	}
 	puts("Server connection established.");
-	/* End test */
+	/* End connection test */
 }
 
 static inline int pnvl_proxy_endpoint(PNVLDevice *dev)
@@ -81,15 +91,13 @@ static inline int pnvl_proxy_endpoint(PNVLDevice *dev)
 
 static ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 {
-	int ret;
 	int con = pnvl_proxy_endpoint(dev);
 	ProxyRequest req = PNVL_REQ_NIL;
 	fd_set cons;
 
 	FD_ZERO(&cons);
 	FD_SET(con, &cons);
-	ret = select(con+1, &cons, NULL, NULL, NULL);
-	if (ret && FD_ISSET(con, &cons))
+	if (select(con+1, &cons, NULL, NULL, NULL) && FD_ISSET(con, &cons))
 		recv(con, &req, sizeof(req), 0);
 
 	return req;
@@ -131,8 +139,7 @@ static int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 
 int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req)
 {
-	int ret;
-	int con = pnvl_proxy_endpoint(dev);
+	int ret, con = pnvl_proxy_endpoint(dev);
 
 	ret = send(con, &req, sizeof(req), 0);
 	if (ret < 0)
@@ -146,13 +153,23 @@ int pnvl_proxy_wait_and_handle_req(PNVLDevice *dev)
 	return pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
 }
 
+int pnvl_proxy_await_req(PNVLDevice *dev, ProxyRequest req)
+{
+	ProxyRequest new_req;
+
+	do {
+		new_req = pnvl_proxy_wait_req(dev);
+	} while(new_req != PNVL_FAILURE && new_req != req);
+
+	return pnvl_proxy_handle_req(dev, new_req);
+}
+
 /*
  * Receive page: buffer <-- socket
  */
 size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 {
-	int ret;
-	int src = pnvl_proxy_endpoint(dev);
+	int ret, src = pnvl_proxy_endpoint(dev);
 	size_t len = 0;
 
 	ret = recv(src, &len, sizeof(len), 0);
@@ -171,8 +188,7 @@ size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
  */
 int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len)
 {
-	int ret;
-	int dst = pnvl_proxy_endpoint(dev);
+	int ret, dst = pnvl_proxy_endpoint(dev);
 
 	if (len <= 0)
 		return PNVL_FAILURE;

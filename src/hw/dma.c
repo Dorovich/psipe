@@ -54,12 +54,11 @@ static inline void pnvl_dma_init_current(DMAEngine *dma)
  */
 size_t pnvl_dma_rx_page(PNVLDevice *dev)
 {
-	size_t ofs, len_want, len_have;
-	unsigned long mask;
 	DMAEngine *dma = &dev->dma;
+	unsigned long mask = pnvl_dma_mask(dma, dma->config.page_size - 1);
 	dma_addr_t addr = dma->current.addr;
+	size_t ofs, len_want, len_have;
 
-	mask = pnvl_dma_mask(dma, dma->config.page_size - 1);
 	ofs = addr & mask;
 	len_have = dma->config.page_size - ofs;
 	len_want = MIN(dma->config.page_size, dma->current.len_left);
@@ -85,7 +84,7 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev)
 
 	dma->current.addr = addr;
 	dma->current.len_left -= len_want;
-	printf("DMA READ: %lu bytes left\n", dma->current.len_left);
+	//printf("DMA READ: %lu bytes left\n", dma->current.len_left);
 	return len_want;
 }
 
@@ -94,12 +93,11 @@ size_t pnvl_dma_rx_page(PNVLDevice *dev)
  */
 int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in)
 {
-	size_t ofs, len_want, len_have;
-	unsigned long mask;
 	DMAEngine *dma = &dev->dma;
+	unsigned long mask = pnvl_dma_mask(dma, dma->config.page_size - 1);
 	dma_addr_t addr = dma->current.addr;
+	size_t ofs, len_want, len_have;
 
-	mask = pnvl_dma_mask(dma, dma->config.page_size - 1);
 	ofs = addr & mask;
 	len_have = dma->config.page_size - ofs;
 	len_want = len_in;
@@ -125,7 +123,7 @@ int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in)
 
 	dma->current.addr = addr;
 	dma->current.len_left -= len_want;
-	printf("DMA WRITE: %lu bytes left\n", dma->current.len_left);
+	//printf("DMA WRITE: %lu bytes left\n", dma->current.len_left);
 	return PNVL_SUCCESS;
 }
 
