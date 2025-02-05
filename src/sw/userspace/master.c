@@ -13,7 +13,7 @@
 #include "sw/module/pnvl_ioctl.h"
 #include "pnvl_util.h"
 
-#define VEC_LEN 3000
+#define VEC_LEN 520000
 
 static int offload_work(int fd, void *addr, size_t len)
 {
@@ -21,13 +21,6 @@ static int offload_work(int fd, void *addr, size_t len)
 		.addr = (unsigned long)addr,
 		.len = (unsigned long)len,
 	};
-
-	/*
-	puts("Reading initial data...");
-
-	for (int i = 0; i < data.len/sizeof(int); ++i)
-		printf("data[%d] =\t%d\n", i, ((int *)data.addr)[i]);
-	*/
 
 	puts("Sending data...");
 
@@ -37,6 +30,8 @@ static int offload_work(int fd, void *addr, size_t len)
 	}
 
 	puts("Data sent! Waiting results...");
+
+	sleep(3);
 
 	if (ioctl(fd, PNVL_IOCTL_WAIT) < 0) {
 		perror("PNVL_IOCTL_WAIT failed!");

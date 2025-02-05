@@ -13,7 +13,7 @@
 #include "sw/module/pnvl_ioctl.h"
 #include "pnvl_util.h"
 
-#define VEC_LEN 3000
+#define VEC_LEN 520000
 
 static int handle_work(int fd, void *addr, size_t len)
 {
