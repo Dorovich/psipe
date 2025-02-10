@@ -17,13 +17,13 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 {
 	struct pnvl_dev *pnvl_dev = data;
 
+	pnvl_irq_ack(pnvl_dev);
+	pnvl_dma_wake(pnvl_dev);
+
 	dev_dbg(&pnvl_dev->pdev->dev, "irq_handler irq = %d dev = %d\n", irq,
 		pnvl_dev->major);
 
 	printk(KERN_DEBUG "pnvl interrupt received - handling\n");
-
-	pnvl_irq_ack(pnvl_dev);
-	pnvl_dma_wake(pnvl_dev);
 
 	return IRQ_HANDLED;
 }

@@ -17,29 +17,25 @@
 
 static void pnvl_proxy_init_server(PNVLDevice *dev)
 {
-	int ret;
 	PNVLProxy *proxy = &dev->proxy;
-	socklen_t len;
+	socklen_t len = sizeof(proxy->client.addr);
 
-	ret = bind(proxy->server.sockd, (struct sockaddr *)&proxy->server.addr,
-		sizeof(proxy->server.addr));
-	if (ret < 0) {
+	if (bind(proxy->server.sockd, (struct sockaddr *)&proxy->server.addr,
+				sizeof(proxy->server.addr)) < 0) {
 		perror("bind");
 		return;
 	}
 
-	ret = listen(proxy->server.sockd, PNVL_PROXY_MAXQ);
-	if (ret < 0) {
+	if (listen(proxy->server.sockd, PNVL_PROXY_MAXQ) < 0) {
 		perror("listen");
 		return;
 	}
 
 	printf("Server started, waiting for client...\n");
 
-	len = sizeof(proxy->client.addr);
 	proxy->client.sockd = accept(proxy->server.sockd,
 			(struct sockaddr *)&proxy->client.addr, &len);
-	if (ret < 0) {
+	if (proxy->client.sockd < 0) {
 		perror("accept");
 		return;
 	}
@@ -59,13 +55,10 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 
 static void pnvl_proxy_init_client(PNVLDevice *dev)
 {
-	int ret;
 	PNVLProxy *proxy = &dev->proxy;
 
-	ret = connect(proxy->server.sockd,
-			(struct sockaddr *)&proxy->server.addr,
-			sizeof(proxy->server.addr));
-	if (ret < 0) {
+	if (connect(proxy->server.sockd, (struct sockaddr *)&proxy->server.addr,
+				sizeof(proxy->server.addr)) < 0) {
 		perror("connect");
 		return;
 	}

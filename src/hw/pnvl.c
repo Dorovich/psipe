@@ -158,7 +158,6 @@ void pnvl_execute(PNVLDevice *dev)
 	switch(dev->dma.mode) {
 	case DMA_MODE_ACTIVE:
 		pnvl_transfer_pages(dev);
-		//pnvl_proxy_wait_and_handle_req(dev);
 		pnvl_receive_pages(dev);
 		if (dev->ret)
 			dev->ret = false;
@@ -169,7 +168,6 @@ void pnvl_execute(PNVLDevice *dev)
 			pnvl_receive_pages(dev);
 			dev->ret = true;
 		} else {
-			//pnvl_proxy_issue_req(dev, PNVL_REQ_ACK);
 			pnvl_transfer_pages(dev);
 			dev->ret = false;
 		}

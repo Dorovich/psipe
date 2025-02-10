@@ -8,15 +8,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include "hw/pnvl_hw.h"
 #include "sw/module/pnvl_ioctl.h"
 #include "pnvl_util.h"
 
-#define VEC_LEN 520000
+#define VEC_LEN 20000
 
 static int offload_work(int fd, void *addr, size_t len)
 {
+	struct timeval t1, t2, t3;
 	struct pnvl_data data = {
 		.addr = (unsigned long)addr,
 		.len = (unsigned long)len,
@@ -24,27 +26,33 @@ static int offload_work(int fd, void *addr, size_t len)
 
 	puts("Sending data...");
 
+	gettimeofday(&t1, NULL);
 	if (ioctl(fd, PNVL_IOCTL_SEND, &data) < 0) {
 		perror("PNVL_IOCTL_SEND failed!");
 		return -1;
 	}
+	gettimeofday(&t2, NULL);
 
-	puts("Data sent! Waiting results...");
+	printf("PNVL_IOCTL_SEND: %ld us elapsed\n", calc_time(&t1, &t2));
 
-	sleep(3);
-
+	gettimeofday(&t2, NULL);
 	if (ioctl(fd, PNVL_IOCTL_WAIT) < 0) {
 		perror("PNVL_IOCTL_WAIT failed!");
 		return -1;
 	}
+	gettimeofday(&t3, NULL);
 
-	puts("Results received! Checking results...");
+	printf("PNVL_IOCTL_WAIT: %ld us elapsed\n", calc_time(&t2, &t3));
+	printf("TOTAL: %ld us elapsed\n", calc_time(&t1, &t3));
+
+	puts("Checking results...");
 
 	int errcnt = 0;
 	for (int i = 0; i < data.len/sizeof(int); ++i) {
 		if (((int *)data.addr)[i] != i)
 			errcnt++;
 	}
+
 	printf("%d errors counted.\n", errcnt);
 
 	return 0;

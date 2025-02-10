@@ -43,6 +43,16 @@ void usage(FILE *fd, char **argv)
 	LOGF(fd, " \t -v \n\t\t run on verbose mode\n");
 }
 
+long int calc_time(struct timeval *t1, struct timeval *t2)
+{
+	long int us1, us2;
+
+	us1 = t1->tv_sec * 1000000 + t1->tv_usec;
+	us2 = t2->tv_sec * 1000000 + t2->tv_usec;
+
+	return us2 - us1;
+}
+
 int open_pnvl_dev(struct context *ctx)
 {
 	char filename[64];

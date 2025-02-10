@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 struct context {
 	int fd;			/* file descriptor of dev file */
@@ -18,3 +19,4 @@ struct context {
 void usage(FILE * fd, char **argv);
 int open_pnvl_dev(struct context *ctx);
 struct context parse_args(int argc, char **argv);
+long int calc_time(struct timeval *t1, struct timeval *t2);

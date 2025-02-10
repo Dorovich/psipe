@@ -131,6 +131,9 @@ int pnvl_dma_begin_run(PNVLDevice *dev)
 {
 	DMAStatus status;
 
+	if (!dev->dma.config.handles)
+		return PNVL_FAILURE;
+
 	pnvl_dma_init_current(&dev->dma);
 	status = qatomic_cmpxchg(&dev->dma.status, DMA_STATUS_IDLE,
 			DMA_STATUS_EXECUTING);
@@ -154,7 +157,7 @@ void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
 
 bool pnvl_dma_is_idle(PNVLDevice *dev)
 {
-	return (qatomic_read(&dev->dma.status) == DMA_STATUS_IDLE);
+	return qatomic_read(&dev->dma.status) == DMA_STATUS_IDLE;
 }
 
 bool pnvl_dma_is_finished(PNVLDevice *dev)
@@ -169,13 +172,20 @@ void pnvl_dma_reset(PNVLDevice *dev)
 	dma->config.npages = 0;
 	dma->config.len = 0;
 	dma->config.page_size = qemu_target_page_size();
+	memset(dma->buff, 0, PNVL_HW_DMA_AREA_SIZE);
+	/*
 	memset(dma->config.handles, 0,
 			sizeof(dma_addr_t) * PNVL_HW_BAR0_DMA_HANDLES_CNT);
-	memset(dma->buff, 0, PNVL_HW_DMA_AREA_SIZE);
+	*/
+	if (dma->config.handles) {
+		free(dma->config.handles);
+		dma->config.handles = NULL;
+	}
 }
 
 void pnvl_dma_init(PNVLDevice *dev, Error **errp)
 {
+	dev->dma.config.handles = NULL;
 	pnvl_dma_reset(dev);
 	dev->dma.config.mask = DMA_BIT_MASK(PNVL_HW_DMA_ADDR_CAPABILITY);
 }
