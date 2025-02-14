@@ -33,7 +33,8 @@ struct pnvl_dma {
 	size_t npages;
 	int mode;
 	enum dma_data_direction direction;
-	struct page *pages[PNVL_HW_BAR0_DMA_HANDLES_CNT];
+	/* struct page *pages[PNVL_HW_BAR0_DMA_HANDLES_CNT]; */
+	struct page **pages;
 };
 
 struct pnvl_irq {

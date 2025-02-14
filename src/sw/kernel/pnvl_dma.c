@@ -17,18 +17,20 @@ bool pnvl_dma_check_size_avail(struct pnvl_dev *pnvl_dev)
 
 int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 {
-	int first_page, last_page, npages, npages_pinned = 0;
+	struct pnvl_dma *dma = &pnvl_dev->dma;
 	struct pnvl_data *data = &pnvl_dev->data;
+	int first_page, last_page, npages, npages_pinned = 0;
 
 	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
 	last_page = ((data->addr + data->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	npages = last_page - first_page + 1;
+	dma->pages = kmalloc(npages * sizeof(struct page *), GFP_KERNEL);
 	npages_pinned = pin_user_pages_fast(data->addr, npages,
-					FOLL_LONGTERM, pnvl_dev->dma.pages);
+					FOLL_LONGTERM, dma->pages);
 
-	pnvl_dev->dma.offset = data->addr & ~PAGE_MASK;
-	pnvl_dev->dma.npages = npages;
-	pnvl_dev->dma.len = data->len;
+	dma->offset = data->addr & ~PAGE_MASK;
+	dma->npages = npages;
+	dma->len = data->len;
 
 	return npages_pinned - npages;
 }
@@ -132,6 +134,8 @@ void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev)
 			dma->len, dma->direction);
 		unpin_user_page(dma->pages[i]);
 	}
+
+	kfree(dma->pages);
 }
 
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev)
