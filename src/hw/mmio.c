@@ -39,15 +39,6 @@ static void pnvl_mmio_write_handle(DMAEngine *dma, hwaddr addr, uint64_t hnd)
 	printf("New handle: %#010lx @ %#010lx (pos=%d)\n", hnd, addr, pos);
 }
 
-static void pnvl_mmio_alloc_handles(DMAEngine *dma, uint64_t npages)
-{
-	if (dma->config.npages >= npages)
-		return;
-	if (dma->config.handles)
-		free(dma->config.handles);
-	dma->config.handles = malloc(npages);
-}
-
 static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 {
 	PNVLDevice *dev = opaque;
@@ -69,7 +60,7 @@ static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 	case PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL:
 		if (dev->dma.mode == DMA_MODE_ACTIVE) {
 			pnvl_proxy_issue_req(dev, PNVL_REQ_SLN);
-			pnvl_proxy_wait_and_handle_req(dev);
+			pnvl_proxy_await_req(dev, PNVL_REQ_RLN);
 		}
 		val = dev->dma.config.len_avail;
 		break;
@@ -102,7 +93,6 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 		dma->config.len = val;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_PGS:
-		pnvl_mmio_alloc_handles(dma, val);
 		dma->config.npages = val;
 		break;
 	case PNVL_HW_BAR0_DMA_CFG_MOD:

@@ -162,15 +162,13 @@ int pnvl_proxy_await_req(PNVLDevice *dev, ProxyRequest req)
  */
 size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 {
-	int ret, src = pnvl_proxy_endpoint(dev);
+	int src = pnvl_proxy_endpoint(dev);
 	size_t len = 0;
 
-	ret = recv(src, &len, sizeof(len), 0);
-	if (ret < 0 || !len)
+	if (recv(src, &len, sizeof(len), 0) < 0 || !len)
 		return PNVL_FAILURE;
 
-	ret = recv(src, buff, len, 0);
-	if (ret < 0)
+	if (recv(src, buff, len, 0) < 0)
 		return PNVL_FAILURE;
 
 	return len;
@@ -179,19 +177,17 @@ size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 /*
  * Transmit page: buffer --> socket
  */
-int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, size_t len)
+int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, int len)
 {
-	int ret, dst = pnvl_proxy_endpoint(dev);
+	int dst = pnvl_proxy_endpoint(dev);
 
 	if (len <= 0)
 		return PNVL_FAILURE;
 
-	ret = send(dst, &len, sizeof(len), 0);
-	if (ret < 0)
+	if (send(dst, &len, sizeof(len), 0) < 0)
 		return PNVL_FAILURE;
 
-	ret = send(dst, buff, len, 0);
-	if (ret < 0)
+	if (send(dst, buff, len, 0) < 0)
 		return PNVL_FAILURE;
 
 	return PNVL_SUCCESS;

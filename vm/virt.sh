@@ -1,7 +1,7 @@
 #!/bin/sh
 
 server=off
-port=9993
+port=9995
 disk="vda-cli.img"
 name="Linux 6.6.72 on riscv64 PNVL-client"
 
@@ -22,7 +22,8 @@ while getopts "dsp:" opt; do
 done
 shift $((OPTIND-1))
 
-qemu-system-riscv64 \
+#qemu-system-riscv64 \
+~/src/proto-nvlink/qemu/build/qemu-system-riscv64 \
 	-machine virt \
 	-cpu rv64 \
 	-m 256M \

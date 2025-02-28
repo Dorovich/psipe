@@ -25,8 +25,7 @@ typedef struct DMAConfig {
 	dma_size_t len_avail;
 	dma_mask_t mask;
 	size_t page_size;
-	/* dma_addr_t handles[PNVL_HW_BAR0_DMA_HANDLES_CNT]; */
-	dma_addr_t *handles;
+	dma_addr_t handles[PNVL_HW_BAR0_DMA_HANDLES_CNT];
 } DMAConfig;
 
 typedef struct DMACurrent {
@@ -59,8 +58,8 @@ typedef struct DMAEngine {
  * ============================================================================
  */
 
-size_t pnvl_dma_rx_page(PNVLDevice *dev);
-int pnvl_dma_tx_page(PNVLDevice *dev, size_t len_in);
+int pnvl_dma_rx_page(PNVLDevice *dev);
+int pnvl_dma_tx_page(PNVLDevice *dev, int len_want);
 
 int pnvl_dma_begin_run(PNVLDevice *dev);
 void pnvl_dma_end_run(PNVLDevice *dev);
