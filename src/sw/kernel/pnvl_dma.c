@@ -17,6 +17,8 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
 	last_page = ((data->addr + data->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	npages = last_page - first_page + 1;
+	if (npages > PNVL_HW_BAR0_DMA_HANDLES_CNT)
+		return -1;
 	pinned = pin_user_pages_fast(data->addr, npages, FOLL_LONGTERM,
 			dma->pages);
 

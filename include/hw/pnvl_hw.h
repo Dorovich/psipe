@@ -31,8 +31,10 @@
 #define PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL 0x28
 #define PNVL_HW_BAR0_DMA_DOORBELL_RING 0x30
 #define PNVL_HW_BAR0_DMA_HANDLES 0x38
-/* 512 for a space of 2MB (if PAGE_SIZE is 4KB); 1 more if offset exists */
-#define PNVL_HW_BAR0_DMA_HANDLES_CNT (512+1)
+/* 512 for a space of 2MB (if PAGE_SIZE is 4KB), or
+ * 131072 (1MB) for a space of 512MB (if PAGE_SIZE is 4KB)
+ * ... and 1 more if offset exists */
+#define PNVL_HW_BAR0_DMA_HANDLES_CNT (131072+1)
 
 #define PNVL_HW_BAR0_START PNVL_HW_BAR0_IRQ_0_RAISE
 #define PNVL_HW_BAR0_END \

@@ -160,7 +160,7 @@ int pnvl_proxy_await_req(PNVLDevice *dev, ProxyRequest req)
 /*
  * Receive page: buffer <-- socket
  */
-size_t pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
+int pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 {
 	int src = pnvl_proxy_endpoint(dev);
 	size_t len = 0;

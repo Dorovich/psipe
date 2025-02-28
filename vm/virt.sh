@@ -26,7 +26,7 @@ shift $((OPTIND-1))
 ~/src/proto-nvlink/qemu/build/qemu-system-riscv64 \
 	-machine virt \
 	-cpu rv64 \
-	-m 256M \
+	-m 2G \
 	-smp 1 \
 	-drive file=$disk,format=raw,if=none,id=hd0 \
 	-device virtio-blk-device,drive=hd0 \
