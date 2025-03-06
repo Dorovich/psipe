@@ -60,7 +60,8 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev);
 int pnvl_dma_get_handles(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_dismantle(struct pnvl_dev *pnvl_dev);
+void pnvl_dma_release_handles(struct pnvl_dev *pnvl_dev);
+void pnvl_dma_unpin_pages(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wake(struct pnvl_dev *pnvl_dev);
 

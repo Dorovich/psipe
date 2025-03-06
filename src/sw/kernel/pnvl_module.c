@@ -114,7 +114,7 @@ static int pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, unsigned long arg)
 	pnvl_dma_write_params(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_dismantle(pnvl_dev);
+	pnvl_dma_unpin_pages(pnvl_dev);
 
 	return 0;
 }
@@ -125,7 +125,8 @@ static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
 		return -EINVAL;
 
 	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_dismantle(pnvl_dev);
+	pnvl_dma_release_handles(pnvl_dev);
+	pnvl_dma_unpin_pages(pnvl_dev);
 	pnvl_mode_off(pnvl_dev);
 
 	return 0;
@@ -137,9 +138,13 @@ static int pnvl_ioctl_return(struct pnvl_dev *pnvl_dev)
 		return -EINVAL;
 
 	pnvl_mode_active(pnvl_dev);
+	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
+		return -ENOMEM;
+
 	pnvl_dma_doorbell_ring(pnvl_dev);
 	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_dismantle(pnvl_dev);
+	pnvl_dma_release_handles(pnvl_dev);
+	pnvl_dma_unpin_pages(pnvl_dev);
 	pnvl_mode_off(pnvl_dev);
 
 	return 0;

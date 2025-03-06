@@ -163,7 +163,7 @@ int pnvl_proxy_await_req(PNVLDevice *dev, ProxyRequest req)
 int pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 {
 	int src = pnvl_proxy_endpoint(dev);
-	size_t len = 0;
+	int len = 0;
 
 	if (recv(src, &len, sizeof(len), 0) < 0 || !len)
 		return PNVL_FAILURE;
