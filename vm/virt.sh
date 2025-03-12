@@ -2,12 +2,12 @@
 
 server=off
 port=9995
-disk="vda-cli.img"
+disk="vdb-1.img"
 name="Linux 6.6.72 on riscv64 PNVL-client"
 
-while getopts "dsp:" opt; do
+while getopts "gsp:d:" opt; do
 	case "$opt" in
-		d)
+		g)
 			flags="-s"
 			;;
 		s)
@@ -17,6 +17,9 @@ while getopts "dsp:" opt; do
 			;;
 		p)
 			port=$OPTARG
+			;;
+		d)
+			disk=$OPTARG
 			;;
 	esac
 done

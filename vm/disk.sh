@@ -19,6 +19,7 @@ while getopts "iur" opt; do
 			sudo cp $code/kernel/pnvl.ko $point
 			sudo cp $code/userspace/master $point
 			sudo cp $code/userspace/chiplet $point
+			sudo cp $code/userspace/master-multi $point
 			;;
 		r)
 			sudo umount $point
