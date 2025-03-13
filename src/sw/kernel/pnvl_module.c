@@ -44,7 +44,7 @@ static int pnvl_open(struct inode *inode, struct file *fp)
 static bool pnvl_copy_data(struct pnvl_dev *pnvl_dev, unsigned long arg)
 {
 	struct pnvl_data *kdata = &pnvl_dev->data;
-	struct pnvl_data __user *udata = (struct pnvl_data *)arg;
+	struct pnvl_data __user *udata = (void *)arg;
 	return (access_ok(udata, sizeof(*udata)) &&
 			!copy_from_user(kdata, udata, sizeof(*kdata)));
 }
@@ -300,8 +300,9 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	cdev_init(&pnvl_dev->cdev, &pnvl_fops);
 
-	err = cdev_add(&pnvl_dev->cdev, MKDEV(pnvl_dev->major,
-				pnvl_dev->minor), PNVL_HW_BAR_CNT);
+	err = cdev_add(&pnvl_dev->cdev,
+			MKDEV(pnvl_dev->major, pnvl_dev->minor),
+			PNVL_HW_BAR_CNT);
 	if (err) {
 		dev_err(&pdev->dev, "cdev_add failed\n");
 		goto err_cdev_add;
