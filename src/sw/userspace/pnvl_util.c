@@ -43,6 +43,16 @@ void usage(FILE *fd, char **argv)
 	LOGF(fd, " \t -v \n\t\t run on verbose mode\n");
 }
 
+void usage_multi(FILE *fd, char **argv)
+{
+	LOGF(fd, "Usage : %s [-b bus] [-d dom] [-h] [-r regs] [-s slot] [-v]\n",
+		argv[0]);
+	LOGF(fd, " \t -n len \n\t\t number of chiplet connections\n");
+	LOGF(fd, " \t -d filename \n\t\t pci domain number of device\n");
+	LOGF(fd, " \t -l len \n\t\t length of integers to transmit\n");
+	LOGF(fd, " \t -h \n\t\t display this help message\n");
+}
+
 long int calc_time(struct timeval *t1, struct timeval *t2)
 {
 	long int us1, us2;
@@ -172,4 +182,86 @@ struct context parse_args(int argc, char **argv)
 
 
 	return ctx;
+}
+
+struct context_multi parse_args_multi(int argc, char **argv)
+{
+	int op;
+	char *endptr;
+	struct context_multi ctx;
+	int fds_pos = 0;
+	
+	ctx.fds_len = 0;
+	ctx.fds = NULL;
+	ctx.data_len = 0;
+	ctx.data = NULL;
+
+	while ((op = getopt(argc, argv, "n:d:l:h")) != -1) {
+		switch (op) {
+		case 'n':
+			ctx.fds_len = strtol(optarg, &endptr, 10);
+			if (errno != 0 || optarg == endptr) {
+				LOG_ERR("strtol: invalid value (%s) for"
+					"argument %c\n", optarg, op);
+				exit(-1);
+			}
+			if (ctx.fds)
+				free(ctx.fds);
+			ctx.fds = calloc(ctx.fds_len, sizeof(int));
+			break;
+		case 'l':
+			ctx.data_len = strtol(optarg, &endptr, 10);
+			if (errno != 0 || optarg == endptr) {
+				LOG_ERR("strtol: invalid value (%s) for"
+					"argument %c\n", optarg, op);
+				exit(-1);
+			}
+			if (ctx.data)
+				free(ctx.data);
+			ctx.data = calloc(ctx.data_len, sizeof(int));
+			break;
+		case 'd':
+			if (!ctx.fds || !ctx.fds_len || (ctx.fds_len > 0
+						&& fds_pos == ctx.fds_len))
+				break;
+			ctx.fds[fds_pos] = open(optarg, O_RDWR | O_SYNC);
+			if (errno != 0 || ctx.fds[fds_pos] < 0) {
+				LOG_ERR("strtol: invalid value (%s) for"
+					"argument %c\n", optarg, op);
+				exit(-1);
+			}
+			fds_pos++;
+			break;
+		case 'h':
+			usage_multi(stdout, argv);
+			exit(0);
+		default:
+			usage_multi(stderr, argv);
+			exit(-1);
+		}
+	}
+
+	if (!ctx.fds_len) {
+		LOG_ERR("A number of devices must be provided.\n");
+		exit(-1);
+	}
+
+	if (fds_pos != ctx.fds_len) {
+		LOG_ERR("Missing devices. Consult /dev/pnvl/ to "
+				"find available ones.\n");
+		exit(-1);
+	}
+
+	if (!ctx.data_len) {
+		LOG_ERR("A positive number of integers must be provided.\n");
+		exit(-1);
+	}
+
+	return ctx;
+}
+
+void free_context_multi(struct context_multi *ctx)
+{
+	for (int i = 0; i < ctx->fds_len; ++i)
+		close(ctx->fds[i]);
 }

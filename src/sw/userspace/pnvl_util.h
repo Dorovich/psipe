@@ -17,7 +17,16 @@ struct context {
 	size_t vec_len;		/* number of integers to transmit */
 };
 
+struct context_multi {
+	size_t fds_len;		/* number of chiplets */
+	int *fds;		/* array of file descriptors of devices*/
+	size_t data_len;	/* number of integers to transmit */ 
+	int *data;		/* array of integers for work */
+};
+
 void usage(FILE * fd, char **argv);
 int open_pnvl_dev(struct context *ctx);
 struct context parse_args(int argc, char **argv);
+struct context_multi parse_args_multi(int argc, char **argv);
 long int calc_time(struct timeval *t1, struct timeval *t2);
+void free_context_multi(struct context_multi *ctx);
