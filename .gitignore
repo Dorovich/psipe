@@ -25,9 +25,12 @@ build/
 /src/hw/pnvl_hw.h
 
 # user programs
-src/sw/userspace/chiplet
-src/sw/userspace/master
-src/sw/userspace/master-multi
+src/sw/userspace/chiplet0
+src/sw/userspace/master0
+src/sw/userspace/chiplet1
+src/sw/userspace/master1
+src/sw/userspace/master-mm
+src/sw/userspace/chiplet-mm
 
 # kernel module
 *.symvers

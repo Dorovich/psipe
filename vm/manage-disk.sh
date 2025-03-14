@@ -14,9 +14,10 @@ while getopts "iura" opt; do
 			;;
 		u) # UPDATE PROGRAMS
 			sudo cp $code/kernel/pnvl.ko $point
-			sudo cp $code/userspace/master $point
-			sudo cp $code/userspace/chiplet $point
-			sudo cp $code/userspace/master-multi $point
+			sudo cp $code/userspace/master0 $point
+			sudo cp $code/userspace/chiplet0 $point
+			sudo cp $code/userspace/master1 $point
+			sudo cp $code/userspace/chiplet1 $point
 			;;
 		r) # UNMOUNT DISK IMAGE
 			sudo umount $point
@@ -28,9 +29,10 @@ while getopts "iura" opt; do
 			sudo losetup -P $dev vda.img
 			sudo mount $part $point
 			sudo cp $code/kernel/pnvl.ko $point
-			sudo cp $code/userspace/master $point
-			sudo cp $code/userspace/chiplet $point
-			sudo cp $code/userspace/master-multi $point
+			sudo cp $code/userspace/master0 $point
+			sudo cp $code/userspace/chiplet0 $point
+			sudo cp $code/userspace/master1 $point
+			sudo cp $code/userspace/chiplet1 $point
 			sudo umount $point
 			sudo losetup -d $dev
 			rm -rf $point

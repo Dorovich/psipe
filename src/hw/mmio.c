@@ -104,6 +104,9 @@ static void pnvl_mmio_write(void *opaque, hwaddr addr, uint64_t val,
 	case PNVL_HW_BAR0_DMA_DOORBELL_RING:
 		pnvl_execute(dev);
 		break;
+	case PNVL_HW_BAR0_RETURN:
+		dev->ret.active = val > 0;
+		break;
 	default: /* DMA handles area */
 		pnvl_mmio_write_handle(dma, addr, val);
 		break;

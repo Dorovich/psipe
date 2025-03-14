@@ -78,6 +78,8 @@ void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
 	iowrite32((u32)data->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
 	iowrite32((u32)dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
+	iowrite32((u32)(pnvl_dev->sending || pnvl_dev->recving),
+			mmio + PNVL_HW_BAR0_RETURN);
 
 	for (int i = 0; i < dma->npages; ++i) {
 		iowrite32((u32)dma->dma_handles[i],
