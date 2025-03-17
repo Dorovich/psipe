@@ -5,7 +5,7 @@ build_dir := build/
 include_dir := $(abspath ../../../include/)
 includes := $(addprefix -I, $(include_dir))
 cflags := -static -static-libgcc -Wall -Werror -O2 $(includes)
-targets := master0 chiplet0 master1 chiplet1
+targets := master0 chiplet0 master1 chiplet1 master-mm chiplet-mm
 util := $(build_dir)pnvl_util.o
 
 CC := riscv64-linux-gnu-gcc
