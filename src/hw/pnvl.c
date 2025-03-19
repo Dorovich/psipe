@@ -158,7 +158,8 @@ void pnvl_execute(PNVLDevice *dev)
 	switch(dev->dma.mode) {
 	case DMA_MODE_ACTIVE:
 		pnvl_transfer_pages(dev);
-		pnvl_receive_pages(dev);
+		if (dev->ret.active)
+			pnvl_receive_pages(dev);
 		break;
 	case DMA_MODE_PASSIVE:
 		if (dev->ret.active && dev->ret.swap) {

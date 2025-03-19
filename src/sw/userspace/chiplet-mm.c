@@ -13,11 +13,6 @@
 #include "sw/module/pnvl_ioctl.h"
 
 #define TYPE double
-#define TRUNCATE 1
-#define APPEND   2
-#define SIZE_N 1224
-#define SIZE_T 960
-#define SIZE_M 1446
 
 /* ============================================================================
  * AUXILIARY FUNCTIONS
@@ -100,22 +95,20 @@ static void _pnvl_matmul_recv_params(int fd, int *sz_n, int *sz_t, int *sz_m)
 	*sz_m = params[2];
 }
 
-static void _pnvl_matmul_recv_matrix(int fd, int sz_r, int sz_c,
-		TYPE (*mat)[sz_c])
+static void _pnvl_matmul_recv(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {
-		.addr = (unsigned long)mat,
-		.len = (unsigned long)(sz_r * sz_c * sizeof(TYPE)),
+		.addr = (unsigned long)addr,
+		.len = (unsigned long)len,
 	};
 	ioctl(fd, PNVL_IOCTL_RECV, &data);
 }
 
-static struct pnvl_data *_pnvl_matmul_arecv_matrix(int fd, int sz_r, int sz_c,
-		TYPE (*mat)[sz_c])
+static struct pnvl_data *_pnvl_matmul_arecv(int fd, void *addr, size_t len)
 {
 	struct pnvl_data *data = malloc(sizeof(*data));
-	data->addr = (unsigned long)mat;
-	data->len = (unsigned long)(sz_r * sz_c * sizeof(TYPE));
+	data->addr = (unsigned long)addr;
+	data->len = (unsigned long)len;
 	ioctl(fd, PNVL_IOCTL_ARECV, data);
 	return data;
 }
@@ -146,32 +139,33 @@ void matmul_func(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
 int main(int argc, char *argv [])
 {
 	int sz_n, sz_t, sz_m;
+	TYPE *A, *B, *C;
+	size_t sz_A, sz_B, sz_C;
 	struct pnvl_data *handle;
 	struct _pnvl_devs *devs = _pnvl_matmul_open_devs();
+	if (!devs)
+		return -1;
 	int fd = devs->fds[0];
 
 	_pnvl_matmul_recv_params(fd, &sz_n, &sz_t, &sz_m);
-	/*
-	TYPE **A = malloc(sz_n * sz_t * sizeof(TYPE));
-	TYPE **B = malloc(sz_t * sz_m * sizeof(TYPE));
-	TYPE **C = malloc(sz_n * sz_m * sizeof(TYPE));
-	*/
-	TYPE A[sz_n][sz_t];
-	TYPE B[sz_t][sz_m];
-	TYPE C[sz_n][sz_m];
-	_pnvl_matmul_recv_matrix(fd, sz_n, sz_t, A);
-	_pnvl_matmul_recv_matrix(fd, sz_t, sz_m, B);
-	handle = _pnvl_matmul_arecv_matrix(fd, sz_n, sz_m, C);
+	sz_A = sz_n * sz_t * sizeof(TYPE);
+	sz_B = sz_t * sz_m * sizeof(TYPE);
+	sz_C = sz_n * sz_m * sizeof(TYPE);
+	A = malloc(sz_A);
+	B = malloc(sz_B);
+	C = malloc(sz_C);
+	_pnvl_matmul_recv(fd, A, sz_A);
+	_pnvl_matmul_recv(fd, B, sz_B);
+	handle = _pnvl_matmul_arecv(fd, C, sz_C);
 
-	matmul_func(sz_n, sz_t, sz_m, C, A, B);
+	matmul_func(sz_n, sz_t, sz_m, (TYPE (*)[sz_n])C, (TYPE (*)[sz_t])A,
+			(TYPE (*)[sz_m])B);
 
 	_pnvl_matmul_return(fd, handle);
 	_pnvl_matmul_close_devs(devs);
-	/*
 	free(A);
 	free(B);
 	free(C);
-	*/
 
 	return 0;
 }

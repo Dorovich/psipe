@@ -13,11 +13,6 @@
 #include "sw/module/pnvl_ioctl.h"
 
 #define TYPE double
-#define TRUNCATE 1
-#define APPEND   2
-#define SIZE_N 1224
-#define SIZE_T 960
-#define SIZE_M 1446
 
 /* ============================================================================
  * AUXILIARY FUNCTIONS
@@ -59,8 +54,7 @@ static void _pnvl_matmul_close_devs(struct _pnvl_devs *devs)
 
 static struct _pnvl_devs *_pnvl_matmul_open_devs()
 {
-	const char *devs_path = "/dev/pnvl";
-	DIR *dir = opendir(devs_path);
+	DIR *dir = opendir("/dev/pnvl");
 	struct dirent *entry;
 	struct _pnvl_devs *devs = malloc(sizeof(*devs));
 	devs->num = _pnvl_matmul_count_devs();
@@ -76,7 +70,7 @@ static struct _pnvl_devs *_pnvl_matmul_open_devs()
 	while ((entry = readdir(dir))) {
 		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
 			continue;
-		snprintf(path, sizeof(path), "%s/%s", devs_path, entry->d_name);
+		snprintf(path, sizeof(path), "/dev/pnvl/%s", entry->d_name);
 		devs->fds[i++] = open(path, O_RDWR | O_SYNC);
 	}
 
@@ -97,37 +91,25 @@ static void _pnvl_matmul_send_params(int fd, int sz_n, int sz_t, int sz_m)
 	ioctl(fd, PNVL_IOCTL_SEND, &data);
 }
 
-static void _pnvl_matmul_send_matrix(int fd, int sz_r, int sz_c, TYPE (*mat)[sz_c])
+static void _pnvl_matmul_send(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {
-		.addr = (unsigned long)mat,
-		.len = (unsigned long)(sz_r * sz_c * sizeof(TYPE)),
+		.addr = (unsigned long)addr,
+		.len = (unsigned long)len,
 	};
 	ioctl(fd, PNVL_IOCTL_SEND, &data);
 }
-
-/*
-static struct pnvl_data *_pnvl_matmul_asend_matrix(int fd, int sz_r, int sz_c,
-		TYPE (*mat)[sz_c])
-{
-	struct pnvl_data *data = malloc(sizeof(*data));
-	data->addr = (unsigned long)mat,
-	data->len = (unsigned long)(sz_r * sz_c * sizeof(TYPE));
-	ioctl(fd, PNVL_IOCTL_ARECV, data);
-	return data;
-}
-
-static void _pnvl_matmul_wait(int fd, struct pnvl_data *data)
-{
-	ioctl(fd, PNVL_IOCTL_WAIT, data);
-	free(data);
-}
-*/
 
 /* ============================================================================
  * MAIN FUNCTIONS
  * ============================================================================
  */
+
+#define TRUNCATE 1
+#define APPEND 2
+#define SIZE_N 80
+#define SIZE_T 100
+#define SIZE_M 90
 
 double now();
 void show_time(char *msg, double t0, double t1);
@@ -141,15 +123,17 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 {
 	double t0, t1;
 	struct _pnvl_devs *devs = _pnvl_matmul_open_devs();
+	if (!devs)
+		return;
 	int fd = devs->fds[0];
 
 	printf ("num_devs %d\n", devs->num);
 	t0 = now();
 
 	_pnvl_matmul_send_params(fd, sz_n, sz_t, sz_m);
-	_pnvl_matmul_send_matrix(fd, sz_n, sz_t, A);
-	_pnvl_matmul_send_matrix(fd, sz_t, sz_m, B);
-	_pnvl_matmul_send_matrix(fd, sz_n, sz_m, C);
+	_pnvl_matmul_send(fd, A, sz_n * sz_t * sizeof(TYPE));
+	_pnvl_matmul_send(fd, B, sz_t * sz_m * sizeof(TYPE));
+	_pnvl_matmul_send(fd, C, sz_n * sz_m * sizeof(TYPE));
 
 	t1 = now();
 

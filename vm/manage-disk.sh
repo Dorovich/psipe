@@ -18,6 +18,8 @@ while getopts "iura" opt; do
 			sudo cp $code/userspace/chiplet0 $point
 			sudo cp $code/userspace/master1 $point
 			sudo cp $code/userspace/chiplet1 $point
+			sudo cp $code/userspace/master-mm $point
+			sudo cp $code/userspace/chiplet-mm $point
 			;;
 		r) # UNMOUNT DISK IMAGE
 			sudo umount $point
@@ -33,6 +35,8 @@ while getopts "iura" opt; do
 			sudo cp $code/userspace/chiplet0 $point
 			sudo cp $code/userspace/master1 $point
 			sudo cp $code/userspace/chiplet1 $point
+			sudo cp $code/userspace/master-mm $point
+			sudo cp $code/userspace/chiplet-mm $point
 			sudo umount $point
 			sudo losetup -d $dev
 			rm -rf $point
