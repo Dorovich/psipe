@@ -19,70 +19,67 @@
  * ============================================================================
  */
 
-struct _pnvl_devs {
+struct _pnvl_devices {
 	int num;
 	int *fds;
 };
 
-static int _pnvl_matmul_count_devs()
+static struct _pnvl_devices *_pnvl_devs;
+
+static int _pnvl_count_devs()
 {
-	const char *devs_path = "/dev/pnvl";
-	DIR *dir = opendir(devs_path);
+	DIR *dir = opendir("/dev/pnvl");
 	struct dirent *entry;
 	int count = 0;
 
 	while ((entry = readdir(dir))) {
-		if (!strcmp(entry->d_name, ".")
-				|| !strcmp(entry->d_name, "..")
-				|| entry->d_type != DT_REG)
-			continue;
-		count++;
+		if (entry->d_type == DT_CHR)
+			count++;
 	}
 
 	return count;
 }
 
-static void _pnvl_matmul_close_devs(struct _pnvl_devs *devs)
+static void _pnvl_close_devs()
 {
-	for (int i = 0; i < devs->num; ++i) {
-		if (devs->fds[i])
-			close(devs->fds[i]);
-	}
-	free(devs->fds);
-	free(devs);
+	for (int i = 0; i < _pnvl_devs->num; ++i)
+		close(_pnvl_devs->fds[i]);
+	free(_pnvl_devs->fds);
+	free(_pnvl_devs);
 }
 
-static struct _pnvl_devs *_pnvl_matmul_open_devs()
+static void _pnvl_open_devs()
 {
-	const char *devs_path = "/dev/pnvl";
-	DIR *dir = opendir(devs_path);
 	struct dirent *entry;
-	struct _pnvl_devs *devs = malloc(sizeof(*devs));
-	devs->num = _pnvl_matmul_count_devs();
-	devs->fds = calloc(devs->num, sizeof(int));
 
+	DIR *dir = opendir("/dev/pnvl");
 	if (!dir) {
-		perror("opendir");
-		goto _open_err;
+		perror("Could not open PNVL devices.");
+		exit(1);
 	}
+
+	int num = _pnvl_count_devs();
+	if (!num) {
+		perror("No devices found.");
+		exit(1);
+	}
+
+	_pnvl_devs = malloc(sizeof(*_pnvl_devs));
+	_pnvl_devs->num = num;
+	_pnvl_devs->fds = malloc(num * sizeof(int));
 
 	char path[512];
 	int i = 0;
 	while ((entry = readdir(dir))) {
-		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
-			continue;
-		snprintf(path, sizeof(path), "%s/%s", devs_path, entry->d_name);
-		devs->fds[i++] = open(path, O_RDWR | O_SYNC);
+		if (entry->d_type == DT_CHR) {
+			snprintf(path, sizeof(path), "/dev/pnvl/%s",
+					entry->d_name);
+			_pnvl_devs->fds[i++] = open(path, O_RDWR | O_SYNC);
+		}
 	}
-
-	return devs;
-
-_open_err:
-	_pnvl_matmul_close_devs(devs);
-	return NULL;
 }
 
-static void _pnvl_matmul_recv_params(int fd, int *sz_n, int *sz_t, int *sz_m)
+static void _pnvl_recv_matmul_params(int fd, int *sz_n, int *sz_t, int *sz_m)
 {
 	int params[3];
 	struct pnvl_data data = {
@@ -95,7 +92,7 @@ static void _pnvl_matmul_recv_params(int fd, int *sz_n, int *sz_t, int *sz_m)
 	*sz_m = params[2];
 }
 
-static void _pnvl_matmul_recv(int fd, void *addr, size_t len)
+static void _pnvl_recv(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {
 		.addr = (unsigned long)addr,
@@ -104,19 +101,18 @@ static void _pnvl_matmul_recv(int fd, void *addr, size_t len)
 	ioctl(fd, PNVL_IOCTL_RECV, &data);
 }
 
-static struct pnvl_data *_pnvl_matmul_arecv(int fd, void *addr, size_t len)
+static void _pnvl_arecv(int fd, void *addr, size_t len)
 {
 	struct pnvl_data *data = malloc(sizeof(*data));
 	data->addr = (unsigned long)addr;
 	data->len = (unsigned long)len;
 	ioctl(fd, PNVL_IOCTL_ARECV, data);
-	return data;
+	free(data);
 }
 
-static void _pnvl_matmul_return(int fd, struct pnvl_data *data)
+static void _pnvl_return(int fd)
 {
-	ioctl(fd, PNVL_IOCTL_RETURN, data);
-	free(data);
+	ioctl(fd, PNVL_IOCTL_RETURN);
 }
 
 /* ============================================================================
@@ -136,33 +132,32 @@ void matmul_func(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
 	}
 }
 
-int main(int argc, char *argv [])
+int main(int argc, char *argv[])
 {
 	int sz_n, sz_t, sz_m;
-	TYPE *A, *B, *C;
+	TYPE **A, **B, **C;
 	size_t sz_A, sz_B, sz_C;
-	struct pnvl_data *handle;
-	struct _pnvl_devs *devs = _pnvl_matmul_open_devs();
-	if (!devs)
-		return -1;
-	int fd = devs->fds[0];
+	_pnvl_open_devs();
+	int fd = _pnvl_devs->fds[0];
 
-	_pnvl_matmul_recv_params(fd, &sz_n, &sz_t, &sz_m);
+	_pnvl_recv_matmul_params(fd, &sz_n, &sz_t, &sz_m);
 	sz_A = sz_n * sz_t * sizeof(TYPE);
 	sz_B = sz_t * sz_m * sizeof(TYPE);
 	sz_C = sz_n * sz_m * sizeof(TYPE);
 	A = malloc(sz_A);
 	B = malloc(sz_B);
 	C = malloc(sz_C);
-	_pnvl_matmul_recv(fd, A, sz_A);
-	_pnvl_matmul_recv(fd, B, sz_B);
-	handle = _pnvl_matmul_arecv(fd, C, sz_C);
+	_pnvl_recv(fd, A, sz_A);
+	_pnvl_recv(fd, B, sz_B);
+	_pnvl_arecv(fd, C, sz_C);
 
-	matmul_func(sz_n, sz_t, sz_m, (TYPE (*)[sz_n])C, (TYPE (*)[sz_t])A,
-			(TYPE (*)[sz_m])B);
+	/* FUNCTION START -------------------------------------- */
+	matmul_func(sz_n, sz_t, sz_m, (TYPE (*)[sz_n])C,
+			(TYPE (*)[sz_n])A, (TYPE (*)[sz_n])B);
+	/* FUNCTION END ---------------------------------------- */
 
-	_pnvl_matmul_return(fd, handle);
-	_pnvl_matmul_close_devs(devs);
+	_pnvl_return(fd);
+	_pnvl_close_devs();
 	free(A);
 	free(B);
 	free(C);

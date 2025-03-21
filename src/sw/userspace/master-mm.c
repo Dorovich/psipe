@@ -19,68 +19,67 @@
  * ============================================================================
  */
 
-struct _pnvl_devs {
+struct _pnvl_devices {
 	int num;
 	int *fds;
 };
 
-static int _pnvl_matmul_count_devs()
+static struct _pnvl_devices *_pnvl_devs;
+
+static int _pnvl_count_devs()
 {
-	const char *devs_path = "/dev/pnvl";
-	DIR *dir = opendir(devs_path);
+	DIR *dir = opendir("/dev/pnvl");
 	struct dirent *entry;
 	int count = 0;
 
 	while ((entry = readdir(dir))) {
-		if (!strcmp(entry->d_name, ".")
-				|| !strcmp(entry->d_name, "..")
-				|| entry->d_type != DT_REG)
-			continue;
-		count++;
+		if (entry->d_type == DT_CHR)
+			count++;
 	}
 
 	return count;
 }
 
-static void _pnvl_matmul_close_devs(struct _pnvl_devs *devs)
+static void _pnvl_close_devs()
 {
-	for (int i = 0; i < devs->num; ++i) {
-		if (devs->fds[i])
-			close(devs->fds[i]);
-	}
-	free(devs->fds);
-	free(devs);
+	for (int i = 0; i < _pnvl_devs->num; ++i)
+		close(_pnvl_devs->fds[i]);
+	free(_pnvl_devs->fds);
+	free(_pnvl_devs);
 }
 
-static struct _pnvl_devs *_pnvl_matmul_open_devs()
+static void _pnvl_open_devs()
 {
-	DIR *dir = opendir("/dev/pnvl");
 	struct dirent *entry;
-	struct _pnvl_devs *devs = malloc(sizeof(*devs));
-	devs->num = _pnvl_matmul_count_devs();
-	devs->fds = calloc(devs->num, sizeof(int));
 
+	DIR *dir = opendir("/dev/pnvl");
 	if (!dir) {
-		perror("opendir");
-		goto _open_err;
+		perror("Could not open PNVL devices.");
+		exit(1);
 	}
+
+	int num = _pnvl_count_devs();
+	if (!num) {
+		perror("No devices found.");
+		exit(1);
+	}
+
+	_pnvl_devs = malloc(sizeof(*_pnvl_devs));
+	_pnvl_devs->num = num;
+	_pnvl_devs->fds = malloc(num * sizeof(int));
 
 	char path[512];
 	int i = 0;
 	while ((entry = readdir(dir))) {
-		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
-			continue;
-		snprintf(path, sizeof(path), "/dev/pnvl/%s", entry->d_name);
-		devs->fds[i++] = open(path, O_RDWR | O_SYNC);
+		if (entry->d_type == DT_CHR) {
+			snprintf(path, sizeof(path), "/dev/pnvl/%s",
+					entry->d_name);
+			_pnvl_devs->fds[i++] = open(path, O_RDWR | O_SYNC);
+		}
 	}
-
-	return devs;
-
-_open_err:
-	_pnvl_matmul_close_devs(devs);
-	return NULL;
 }
 
+/* UNUSED
 static void _pnvl_matmul_send_params(int fd, int sz_n, int sz_t, int sz_m)
 {
 	int params[3] = { sz_n, sz_t, sz_m };
@@ -90,7 +89,20 @@ static void _pnvl_matmul_send_params(int fd, int sz_n, int sz_t, int sz_m)
 	};
 	ioctl(fd, PNVL_IOCTL_SEND, &data);
 }
+*/
 
+static void _pnvl_send_matmul_params_all(int sz_n, int sz_t, int sz_m)
+{
+	int params[3] = { sz_n, sz_t, sz_m };
+	struct pnvl_data data = {
+		.addr = (unsigned long)params,
+		.len = (unsigned long)sizeof(params),
+	};
+	for (int i = 0; i < _pnvl_devs->num; ++i)
+		ioctl(_pnvl_devs->fds[i], PNVL_IOCTL_SEND, &data);
+}
+
+/* UNUSED
 static void _pnvl_matmul_send(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {
@@ -98,6 +110,31 @@ static void _pnvl_matmul_send(int fd, void *addr, size_t len)
 		.len = (unsigned long)len,
 	};
 	ioctl(fd, PNVL_IOCTL_SEND, &data);
+}
+*/
+
+static void _pnvl_send_all(void *addr, size_t len)
+{
+	struct pnvl_data data = {
+		.addr = (unsigned long)addr,
+		.len = (unsigned long)len,
+	};
+	for (int i = 0; i < _pnvl_devs->num; ++i)
+		ioctl(_pnvl_devs->fds[i], PNVL_IOCTL_SEND, &data);
+}
+
+static void _pnvl_asend(int fd, void *addr, size_t len)
+{
+	struct pnvl_data *data = malloc(sizeof(*data));
+	data->addr = (unsigned long)addr;
+	data->len = (unsigned long)len;
+	ioctl(fd, PNVL_IOCTL_ASEND, data);
+	free(data);
+}
+
+static void _pnvl_wait(int fd)
+{
+	ioctl(fd, PNVL_IOCTL_WAIT);
 }
 
 /* ============================================================================
@@ -122,22 +159,33 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 		TYPE (* __restrict__ B)[sz_m])
 {
 	double t0, t1;
-	struct _pnvl_devs *devs = _pnvl_matmul_open_devs();
-	if (!devs)
-		return;
-	int fd = devs->fds[0];
 
-	printf ("num_devs %d\n", devs->num);
+	/* PNVL PART START ------------------------------------- */
+	size_t sz_A, sz_B, sz_C;
+	_pnvl_open_devs();
+	sz_A = sz_n * sz_t * sizeof(TYPE);
+	sz_B = sz_t * sz_m * sizeof(TYPE);
+	sz_C = sz_n * sz_m * sizeof(TYPE);
+	/* PNVL PART END --------------------------------------- */
+
+	printf ("num_devs %d\n", _pnvl_devs->num);
 	t0 = now();
 
-	_pnvl_matmul_send_params(fd, sz_n, sz_t, sz_m);
-	_pnvl_matmul_send(fd, A, sz_n * sz_t * sizeof(TYPE));
-	_pnvl_matmul_send(fd, B, sz_t * sz_m * sizeof(TYPE));
-	_pnvl_matmul_send(fd, C, sz_n * sz_m * sizeof(TYPE));
+	/* PNVL PART START ------------------------------------- */
+	_pnvl_send_matmul_params_all(sz_n, sz_t, sz_m);
+	_pnvl_send_all(A, sz_A);
+	_pnvl_send_all(B, sz_B);
+	for (int i = 0; i < _pnvl_devs->num; ++i)
+		_pnvl_asend(_pnvl_devs->fds[i], C, sz_C);
+	for (int i = 0; i < _pnvl_devs->num; ++i)
+		_pnvl_wait(_pnvl_devs->fds[i]);
+	/* PNVL PART END --------------------------------------- */
 
 	t1 = now();
 
-	_pnvl_matmul_close_devs(devs);
+	/* PNVL PART START ------------------------------------- */
+	_pnvl_close_devs();
+	/* PNVL PART END --------------------------------------- */
 
 	show_time(msg, t0, t1);
 	printf("\nMatrices: ( %d %d ) x ( %d %d ) -> ( %d %d )\n",
