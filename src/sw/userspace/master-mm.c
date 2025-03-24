@@ -19,6 +19,9 @@
  * ============================================================================
  */
 
+// d = dev id, n = total, s = num devs
+#define PART_FOR_DEV(d, n, s) ((n / s) + (d < (n % s)))
+
 struct _pnvl_devices {
 	int num;
 	int *fds;
@@ -93,13 +96,18 @@ static void _pnvl_matmul_send_params(int fd, int sz_n, int sz_t, int sz_m)
 
 static void _pnvl_send_matmul_params_all(int sz_n, int sz_t, int sz_m)
 {
-	int params[3] = { sz_n, sz_t, sz_m };
+	int params[5] = { sz_n, sz_t, sz_m, 0, 0 };
 	struct pnvl_data data = {
 		.addr = (unsigned long)params,
 		.len = (unsigned long)sizeof(params),
 	};
-	for (int i = 0; i < _pnvl_devs->num; ++i)
+	for (int i = 0; i < _pnvl_devs->num; ++i) {
+		// accumulated offset
+		params[4] += params[3];
+		// part length
+		params[3] = PART_FOR_DEV(i, sz_n * sz_m, _pnvl_devs->num);
 		ioctl(_pnvl_devs->fds[i], PNVL_IOCTL_SEND, &data);
+	}
 }
 
 /* UNUSED
@@ -161,11 +169,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 	double t0, t1;
 
 	/* PNVL PART START ------------------------------------- */
-	size_t sz_A, sz_B, sz_C;
 	_pnvl_open_devs();
-	sz_A = sz_n * sz_t * sizeof(TYPE);
-	sz_B = sz_t * sz_m * sizeof(TYPE);
-	sz_C = sz_n * sz_m * sizeof(TYPE);
 	/* PNVL PART END --------------------------------------- */
 
 	printf ("num_devs %d\n", _pnvl_devs->num);
@@ -173,10 +177,16 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 
 	/* PNVL PART START ------------------------------------- */
 	_pnvl_send_matmul_params_all(sz_n, sz_t, sz_m);
-	_pnvl_send_all(A, sz_A);
-	_pnvl_send_all(B, sz_B);
-	for (int i = 0; i < _pnvl_devs->num; ++i)
-		_pnvl_asend(_pnvl_devs->fds[i], C, sz_C);
+	_pnvl_send_all(A, sz_n * sz_t * sizeof(TYPE));
+	_pnvl_send_all(B, sz_t * sz_m * sizeof(TYPE));
+	int offset = 0;
+	for (int i = 0; i < _pnvl_devs->num; ++i) {
+		int part = PART_FOR_DEV(i, sz_n * sz_m, _pnvl_devs->num);
+		printf("Sending %d/%d elements to %d\n", part, sz_n * sz_m, i);
+		_pnvl_asend(_pnvl_devs->fds[i], &C[offset],
+				part * sizeof(TYPE));
+		offset += part;
+	}
 	for (int i = 0; i < _pnvl_devs->num; ++i)
 		_pnvl_wait(_pnvl_devs->fds[i]);
 	/* PNVL PART END --------------------------------------- */
@@ -201,12 +211,12 @@ void matrix_init(char * msg, int rows, int cols, TYPE (* mat)[cols],
 		TYPE random)
 {
 	int loop, i, j;
-	double t0, t1;
+	//double t0, t1;
 
 	// Repeat initialization 4 times to check if there is
 	// any timing variability
 	for (loop = 0; loop < 4; loop++) {
-		t0 = now();
+		//t0 = now();
 
 		for (i=0; i < rows; i++) {
 			for (j=0; j < cols; j++) {
@@ -216,11 +226,11 @@ void matrix_init(char * msg, int rows, int cols, TYPE (* mat)[cols],
 			}
 		}
 
-		t1 = now();
+		//t1 = now();
 
-		show_time(msg, t0, t1);
+		//show_time(msg, t0, t1);
 	}
-	printf("\n");
+	//printf("\n");
 }
 
 TYPE A[SIZE_N][SIZE_T];
