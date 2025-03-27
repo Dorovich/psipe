@@ -106,6 +106,7 @@ static void _pnvl_send_matmul_params_all(int sz_n, int sz_t, int sz_m)
 		params[4] += params[3];
 		// part length
 		params[3] = PART_FOR_DEV(i, sz_n * sz_m, _pnvl_devs->num);
+		printf("dev %d: offset = %d, length = %d\n", i, params[4], params[3]);
 		ioctl(_pnvl_devs->fds[i], PNVL_IOCTL_SEND, &data);
 	}
 }
@@ -152,9 +153,14 @@ static void _pnvl_wait(int fd)
 
 #define TRUNCATE 1
 #define APPEND 2
+/*
 #define SIZE_N 80
 #define SIZE_T 100
 #define SIZE_M 90
+*/
+#define SIZE_N 64
+#define SIZE_T 100
+#define SIZE_M 64
 
 double now();
 void show_time(char *msg, double t0, double t1);
@@ -185,10 +191,11 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 		printf("Sending %d/%d elements to %d\n", part, sz_n * sz_m, i);
 		_pnvl_asend(_pnvl_devs->fds[i], &C[offset],
 				part * sizeof(TYPE));
+		_pnvl_wait(_pnvl_devs->fds[i]);
 		offset += part;
 	}
-	for (int i = 0; i < _pnvl_devs->num; ++i)
-		_pnvl_wait(_pnvl_devs->fds[i]);
+	//for (int i = 0; i < _pnvl_devs->num; ++i){
+		//_pnvl_wait(_pnvl_devs->fds[i]);
 	/* PNVL PART END --------------------------------------- */
 
 	t1 = now();
@@ -304,9 +311,13 @@ int main(int argc, char *argv[])
 
 void *matrix_allocate(char *name, int rows, int cols)
 {
-	TYPE *m = malloc(rows*cols*sizeof(TYPE));
-	if (m == NULL) {
-		fprintf(stderr, "malloc(%s): %s\n", name, strerror(errno));
+	//TYPE *m = malloc(rows*cols*sizeof(TYPE));
+	TYPE *m = NULL;
+	int err = posix_memalign((void *)&m, getpagesize(), rows*cols*sizeof(TYPE) + getpagesize());
+	//if (m == NULL) {
+	if (err != 0) {
+		//fprintf(stderr, "malloc(%s): %s\n", name, strerror(errno));
+		fprintf(stderr, "posix_memalign(%s): %s\n", name, strerror(err));
 		exit(1);
 	}
 	return m;

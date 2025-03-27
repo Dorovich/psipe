@@ -17,12 +17,32 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
 	last_page = ((data->addr + data->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	npages = last_page - first_page + 1;
-	if (npages > PNVL_HW_BAR0_DMA_HANDLES_CNT)
+	if (npages <= 0 || npages > PNVL_HW_BAR0_DMA_HANDLES_CNT)
 		return -1;
+	dma->npages = npages;
+
+	/* TESTING BEGIN */
+	unsigned long end;
+	check_add_overflow(start, len, &end);
+	int test1 = end > TASK_SIZE_MAX; // gup.c - L3207
+	printk(KERN_INFO "test1 - task size exceeded = %d\n", test1);
+
+	unsigned long start = untagged_addr(data->addr) & PAGE_MASK;
+	unsigned long len = npages << PAGE_SHIFT;
+	int test2 = !access_ok((void __user *)start, len); // gup.c - L3209
+	printk(KERN_INFO "test2 - bad access = %d\n", test2);
+
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma = vma_lookup(mm, start);
+	int test3 = !!vma; // gup.c - L1124
+	printk(KERN_INFO "test3 - vma bound crossed = %d\n", test3);
+	/* TESTING END */
+
 	pinned = pin_user_pages_fast(data->addr, npages, FOLL_LONGTERM,
 			dma->pages);
 
-	dma->npages = npages;
+	printk(KERN_INFO "pinning userspace pages - returned %d\n", pinned);
+
 	return -(pinned != npages);
 }
 
@@ -68,7 +88,8 @@ void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	struct pnvl_data *data = &pnvl_dev->data;
 	void __iomem *mmio = pnvl_dev->bar.mmio;
-	size_t ofs = 0;
+	bool ret_data = pnvl_dev->sending || pnvl_dev->recving;
+	unsigned int ofs = 0;
 
 	if (dma->mode == PNVL_MODE_PASSIVE) {
 		iowrite32((u32)data->len,
@@ -78,8 +99,7 @@ void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
 	iowrite32((u32)data->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
 	iowrite32((u32)dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
-	iowrite32((u32)(pnvl_dev->sending || pnvl_dev->recving),
-			mmio + PNVL_HW_BAR0_RETURN);
+	iowrite32((u32)ret_data, mmio + PNVL_HW_BAR0_RETURN);
 
 	for (int i = 0; i < dma->npages; ++i) {
 		iowrite32((u32)dma->dma_handles[i],
