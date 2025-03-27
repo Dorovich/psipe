@@ -22,6 +22,19 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 	dma->npages = npages;
 
 	/* TESTING BEGIN */
+	/*
+	 * Las llamadas a las functiones del kernel que pueden devolver EFAULT
+	 * cuando se usa la funcion pin_user_pages_fast son:
+	 *
+	 * 	1. pin_user_pages_fast			(gup.c - L3320)
+	 * 	2. internal_pin_user_pages_fast		(gup.c - L3181)
+	 * 	3. __gup_longterm_locked		(gup.c - L2108)
+	 * 	4. __get_user_pages_locked		(gup.c - L1391)
+	 * 	5. __get_user_pages			(gup.c - L1096)
+	 *
+	 * Hay que investigar más. Por ahora la función vma_lookup parecer
+	 * devolver un error.
+	 */
 	unsigned long end;
 	check_add_overflow(start, len, &end);
 	int test1 = end > TASK_SIZE_MAX; // gup.c - L3207
