@@ -35,20 +35,21 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 	 * Hay que investigar más. Por ahora la función vma_lookup parecer
 	 * devolver un error.
 	 */
-	unsigned long end;
-	check_add_overflow(start, len, &end);
-	int test1 = end > TASK_SIZE_MAX; // gup.c - L3207
-	printk(KERN_INFO "test1 - task size exceeded = %d\n", test1);
+	{
+		unsigned long end;
+		check_add_overflow(data->addr, data->len, &end);
+		int t1 = end > TASK_SIZE_MAX; // gup.c - L3207
 
-	unsigned long start = untagged_addr(data->addr) & PAGE_MASK;
-	unsigned long len = npages << PAGE_SHIFT;
-	int test2 = !access_ok((void __user *)start, len); // gup.c - L3209
-	printk(KERN_INFO "test2 - bad access = %d\n", test2);
+		unsigned long start = untagged_addr(data->addr) & PAGE_MASK;
+		unsigned long len = npages << PAGE_SHIFT;
+		int t2 = !access_ok((void __user *)start, len); // gup.c - L3209
 
-	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma = vma_lookup(mm, start);
-	int test3 = !!vma; // gup.c - L1124
-	printk(KERN_INFO "test3 - vma bound crossed = %d\n", test3);
+		struct mm_struct *mm = current->mm;
+		struct vm_area_struct *vma = vma_lookup(mm, start);
+		int t3 = !vma; // gup.c - L1124
+
+		printk(KERN_INFO "tests - 1=%d, 2=%d, 3=%d\n", t1, t2, t3);
+	}
 	/* TESTING END */
 
 	pinned = pin_user_pages_fast(data->addr, npages, FOLL_LONGTERM,

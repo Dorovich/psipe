@@ -7,157 +7,14 @@
 #include <malloc.h>
 #include <math.h>
 #include <errno.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include "sw/module/pnvl_ioctl.h"
+#include "pnvl_wrappers.h"
 
 #define TYPE double
 
-/* ============================================================================
- * AUXILIARY FUNCTIONS
- * ============================================================================
- */
-
-// d = dev id, n = total, s = num devs
-#define PART_FOR_DEV(d, n, s) ((n / s) + (d < (n % s)))
-
-struct _pnvl_devices {
-	int num;
-	int *fds;
-};
-
-static struct _pnvl_devices *_pnvl_devs;
-
-static int _pnvl_count_devs()
-{
-	DIR *dir = opendir("/dev/pnvl");
-	struct dirent *entry;
-	int count = 0;
-
-	while ((entry = readdir(dir))) {
-		if (entry->d_type == DT_CHR)
-			count++;
-	}
-
-	return count;
-}
-
-static void _pnvl_close_devs()
-{
-	for (int i = 0; i < _pnvl_devs->num; ++i)
-		close(_pnvl_devs->fds[i]);
-	free(_pnvl_devs->fds);
-	free(_pnvl_devs);
-}
-
-static void _pnvl_open_devs()
-{
-	struct dirent *entry;
-
-	DIR *dir = opendir("/dev/pnvl");
-	if (!dir) {
-		perror("Could not open PNVL devices.");
-		exit(1);
-	}
-
-	int num = _pnvl_count_devs();
-	if (!num) {
-		perror("No devices found.");
-		exit(1);
-	}
-
-	_pnvl_devs = malloc(sizeof(*_pnvl_devs));
-	_pnvl_devs->num = num;
-	_pnvl_devs->fds = malloc(num * sizeof(int));
-
-	char path[512];
-	int i = 0;
-	while ((entry = readdir(dir))) {
-		if (entry->d_type == DT_CHR) {
-			snprintf(path, sizeof(path), "/dev/pnvl/%s",
-					entry->d_name);
-			_pnvl_devs->fds[i++] = open(path, O_RDWR | O_SYNC);
-		}
-	}
-}
-
-/* UNUSED
-static void _pnvl_matmul_send_params(int fd, int sz_n, int sz_t, int sz_m)
-{
-	int params[3] = { sz_n, sz_t, sz_m };
-	struct pnvl_data data = {
-		.addr = (unsigned long)params,
-		.len = (unsigned long)sizeof(params),
-	};
-	ioctl(fd, PNVL_IOCTL_SEND, &data);
-}
-*/
-
-static void _pnvl_send_matmul_params_all(int sz_n, int sz_t, int sz_m)
-{
-	int params[5] = { sz_n, sz_t, sz_m, 0, 0 };
-	struct pnvl_data data = {
-		.addr = (unsigned long)params,
-		.len = (unsigned long)sizeof(params),
-	};
-	for (int i = 0; i < _pnvl_devs->num; ++i) {
-		// accumulated offset
-		params[4] += params[3];
-		// part length
-		params[3] = PART_FOR_DEV(i, sz_n * sz_m, _pnvl_devs->num);
-		printf("dev %d: offset = %d, length = %d\n", i, params[4], params[3]);
-		ioctl(_pnvl_devs->fds[i], PNVL_IOCTL_SEND, &data);
-	}
-}
-
-/* UNUSED
-static void _pnvl_matmul_send(int fd, void *addr, size_t len)
-{
-	struct pnvl_data data = {
-		.addr = (unsigned long)addr,
-		.len = (unsigned long)len,
-	};
-	ioctl(fd, PNVL_IOCTL_SEND, &data);
-}
-*/
-
-static void _pnvl_send_all(void *addr, size_t len)
-{
-	struct pnvl_data data = {
-		.addr = (unsigned long)addr,
-		.len = (unsigned long)len,
-	};
-	for (int i = 0; i < _pnvl_devs->num; ++i)
-		ioctl(_pnvl_devs->fds[i], PNVL_IOCTL_SEND, &data);
-}
-
-static void _pnvl_asend(int fd, void *addr, size_t len)
-{
-	struct pnvl_data *data = malloc(sizeof(*data));
-	data->addr = (unsigned long)addr;
-	data->len = (unsigned long)len;
-	ioctl(fd, PNVL_IOCTL_ASEND, data);
-	free(data);
-}
-
-static void _pnvl_wait(int fd)
-{
-	ioctl(fd, PNVL_IOCTL_WAIT);
-}
-
-/* ============================================================================
- * MAIN FUNCTIONS
- * ============================================================================
- */
+struct _pnvl_devices *_pnvl_devs;
 
 #define TRUNCATE 1
 #define APPEND 2
-/*
-#define SIZE_N 80
-#define SIZE_T 100
-#define SIZE_M 90
-*/
 #define SIZE_N 64
 #define SIZE_T 100
 #define SIZE_M 64
@@ -188,14 +45,20 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 	int offset = 0;
 	for (int i = 0; i < _pnvl_devs->num; ++i) {
 		int part = PART_FOR_DEV(i, sz_n * sz_m, _pnvl_devs->num);
+		int sz_part = part * sizeof(TYPE);
 		printf("Sending %d/%d elements to %d\n", part, sz_n * sz_m, i);
-		_pnvl_asend(_pnvl_devs->fds[i], &C[offset],
-				part * sizeof(TYPE));
+		/*
+		_pnvl_asend(_pnvl_devs->fds[i], &C[offset], sz_part);
 		_pnvl_wait(_pnvl_devs->fds[i]);
+		*/
+		_pnvl_send(_pnvl_devs->fds[i], &C[offset], sz_part);
+		_pnvl_recv(_pnvl_devs->fds[i], &C[offset], sz_part);
 		offset += part;
 	}
-	//for (int i = 0; i < _pnvl_devs->num; ++i){
-		//_pnvl_wait(_pnvl_devs->fds[i]);
+	/*
+	for (int i = 0; i < _pnvl_devs->num; ++i){
+		_pnvl_wait(_pnvl_devs->fds[i]);
+	*/
 	/* PNVL PART END --------------------------------------- */
 
 	t1 = now();

@@ -5,6 +5,14 @@ part="/dev/loop30p1"
 point="${HOME}/src/proto-nvlink/vm/part1"
 code="${HOME}/src/proto-nvlink/src/sw"
 
+km=$code/kernel/pnvl.ko
+m0=$code/userspace/master0
+m1=$code/userspace/master1
+c0=$code/userspace/chiplet0
+c1=$code/userspace/chiplet1
+mm=$code/userspace/master-mm
+cm=$code/userspace/chiplet-mm
+
 while getopts "iura" opt; do
 	case "$opt" in
 		i) # MOUNT DISK IMAGE
@@ -13,13 +21,13 @@ while getopts "iura" opt; do
 			sudo mount $part $point
 			;;
 		u) # UPDATE PROGRAMS
-			sudo cp $code/kernel/pnvl.ko $point
-			sudo cp $code/userspace/master0 $point
-			sudo cp $code/userspace/chiplet0 $point
-			sudo cp $code/userspace/master1 $point
-			sudo cp $code/userspace/chiplet1 $point
-			sudo cp $code/userspace/master-mm $point
-			sudo cp $code/userspace/chiplet-mm $point
+			[ -f $km ] && sudo cp $km $point
+			[ -f $m0 ] && sudo cp $m0 $point
+			[ -f $c0 ] && sudo cp $c0 $point
+			[ -f $m1 ] && sudo cp $m1 $point
+			[ -f $c1 ] && sudo cp $c1 $point
+			[ -f $mm ] && sudo cp $mm $point
+			[ -f $cm ] && sudo cp $cm $point
 			;;
 		r) # UNMOUNT DISK IMAGE
 			sudo umount $point
@@ -30,13 +38,13 @@ while getopts "iura" opt; do
 			mkdir -p $point
 			sudo losetup -P $dev vda.img
 			sudo mount $part $point
-			sudo cp $code/kernel/pnvl.ko $point
-			sudo cp $code/userspace/master0 $point
-			sudo cp $code/userspace/chiplet0 $point
-			sudo cp $code/userspace/master1 $point
-			sudo cp $code/userspace/chiplet1 $point
-			sudo cp $code/userspace/master-mm $point
-			sudo cp $code/userspace/chiplet-mm $point
+			[ -f $km ] && sudo cp $km $point
+			[ -f $m0 ] && sudo cp $m0 $point
+			[ -f $c0 ] && sudo cp $c0 $point
+			[ -f $m1 ] && sudo cp $m1 $point
+			[ -f $c1 ] && sudo cp $c1 $point
+			[ -f $mm ] && sudo cp $mm $point
+			[ -f $cm ] && sudo cp $cm $point
 			sudo umount $point
 			sudo losetup -d $dev
 			rm -rf $point
