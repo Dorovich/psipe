@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	int fd = _pnvl_devs->fds[0];
 	int g_len, g_ofs;
 
-	_pnvl_recv_matmul_params(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
+	_pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
 	sz_A = sz_n * sz_t * sizeof(TYPE);
 	sz_B = sz_t * sz_m * sizeof(TYPE);
 	sz_C = g_len * sizeof(TYPE);
@@ -45,8 +45,7 @@ int main(int argc, char *argv[])
 	pt_C = malloc(sz_C);
 	_pnvl_recv(fd, pt_A, sz_A);
 	_pnvl_recv(fd, pt_B, sz_B);
-	//_pnvl_arecv(fd, pt_C, sz_C);
-	_pnvl_recv(fd, pt_C, sz_C);
+	_pnvl_arecv(fd, pt_C, sz_C);
 
 	TYPE (* __restrict__ A)[sz_t] = (TYPE (*)[sz_t])pt_A;
 	TYPE (* __restrict__ B)[sz_m] = (TYPE (*)[sz_m])pt_B;
@@ -64,8 +63,7 @@ int main(int argc, char *argv[])
 	}
 	/* FUNCTION END ---------------------------------------- */
 
-	//_pnvl_return(fd);
-	_pnvl_send(fd, pt_C, sz_C);
+	_pnvl_return(fd);
 	_pnvl_close_devs();
 	free(pt_A);
 	free(pt_B);

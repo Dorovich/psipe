@@ -23,15 +23,16 @@ int _pnvl_count_devs(void)
 	return count;
 }
 
-void _pnvl_close_devs(void)
+int _pnvl_close_devs(void)
 {
 	for (int i = 0; i < _pnvl_devs->num; ++i)
 		close(_pnvl_devs->fds[i]);
 	free(_pnvl_devs->fds);
 	free(_pnvl_devs);
+	return 0;
 }
 
-void _pnvl_open_devs(void)
+int _pnvl_open_devs(void)
 {
 	struct dirent *entry;
 
@@ -60,104 +61,96 @@ void _pnvl_open_devs(void)
 			_pnvl_devs->fds[i++] = open(path, O_RDWR | O_SYNC);
 		}
 	}
+
+	return 0;
 }
 
-void _pnvl_recv_matmul_params(int fd, int *sz_n, int *sz_t, int *sz_m,
-		int *g_len, int *g_ofs)
+int _pnvl_recv_args(int fd, int *sz_n, int *sz_t, int *sz_m, int *len, int *ofs)
 {
-	int params[5];
+	int rc, params[5];
 	struct pnvl_data data = {
 		.addr = (unsigned long)params,
 		.len = (unsigned long)sizeof(params),
 	};
-	ioctl(fd, PNVL_IOCTL_RECV, &data);
+
+	rc = ioctl(fd, PNVL_IOCTL_RECV, &data);
 	*sz_n = params[0];
 	*sz_t = params[1];
 	*sz_m = params[2];
-	*g_len = params[3];
-	*g_ofs = params[4];
+	*len = params[3];
+	*ofs = params[4];
+
+	return rc;
 }
 
-void _pnvl_recv(int fd, void *addr, size_t len)
+int _pnvl_recv(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {
 		.addr = (unsigned long)addr,
 		.len = (unsigned long)len,
 	};
-	ioctl(fd, PNVL_IOCTL_RECV, &data);
+	return ioctl(fd, PNVL_IOCTL_RECV, &data);
 }
 
-void _pnvl_arecv(int fd, void *addr, size_t len)
+int _pnvl_arecv(int fd, void *addr, size_t len)
 {
+	int rc;
 	struct pnvl_data *data = malloc(sizeof(*data));
 	data->addr = (unsigned long)addr;
 	data->len = (unsigned long)len;
-	ioctl(fd, PNVL_IOCTL_ARECV, data);
+	rc = ioctl(fd, PNVL_IOCTL_ARECV, data);
 	free(data);
+	return rc;
 }
 
-void _pnvl_return(int fd)
+int _pnvl_return(int fd)
 {
-	ioctl(fd, PNVL_IOCTL_RETURN);
+	return ioctl(fd, PNVL_IOCTL_RETURN);
 }
 
-void _pnvl_send_matmul_params(int fd, int sz_n, int sz_t, int sz_m)
+int _pnvl_send_args(int fd, int sz_n, int sz_t, int sz_m, int len, int ofs)
 {
-	int params[3] = { sz_n, sz_t, sz_m };
+	int params[5] = { sz_n, sz_t, sz_m, len, ofs };
 	struct pnvl_data data = {
 		.addr = (unsigned long)params,
 		.len = (unsigned long)sizeof(params),
 	};
-	ioctl(fd, PNVL_IOCTL_SEND, &data);
+	return ioctl(fd, PNVL_IOCTL_SEND, &data);
 }
 
-void _pnvl_send_matmul_params_all(int sz_n, int sz_t, int sz_m)
-{
-	int params[5] = { sz_n, sz_t, sz_m, 0, 0 };
-	struct pnvl_data data = {
-		.addr = (unsigned long)params,
-		.len = (unsigned long)sizeof(params),
-	};
-	for (int i = 0; i < _pnvl_devs->num; ++i) {
-		// accumulated offset
-		params[4] += params[3];
-		// part length
-		params[3] = PART_FOR_DEV(i, sz_n * sz_m, _pnvl_devs->num);
-		printf("dev %d: offset = %d, length = %d\n", i,
-				params[4], params[3]);
-		ioctl(_pnvl_devs->fds[i], PNVL_IOCTL_SEND, &data);
-	}
-}
-
-void _pnvl_send(int fd, void *addr, size_t len)
+int _pnvl_send(int fd, void *addr, size_t len)
 {
 	struct pnvl_data data = {
 		.addr = (unsigned long)addr,
 		.len = (unsigned long)len,
 	};
-	ioctl(fd, PNVL_IOCTL_SEND, &data);
+	return ioctl(fd, PNVL_IOCTL_SEND, &data);
 }
 
-void _pnvl_send_all(void *addr, size_t len)
+int _pnvl_asend(int fd, void *addr, size_t len)
 {
-	struct pnvl_data data = {
-		.addr = (unsigned long)addr,
-		.len = (unsigned long)len,
-	};
-	for (int i = 0; i < _pnvl_devs->num; ++i)
-		ioctl(_pnvl_devs->fds[i], PNVL_IOCTL_SEND, &data);
-}
-
-void _pnvl_asend(int fd, void *addr, size_t len)
-{
+	int rc;
 	struct pnvl_data *data = malloc(sizeof(*data));
 	data->addr = (unsigned long)addr;
 	data->len = (unsigned long)len;
-	ioctl(fd, PNVL_IOCTL_ASEND, data);
+	rc = ioctl(fd, PNVL_IOCTL_ASEND, data);
 	free(data);
+	return rc;
 }
 
-void _pnvl_wait(int fd)
+int _pnvl_wait(int fd)
 {
-	ioctl(fd, PNVL_IOCTL_WAIT);
+	return ioctl(fd, PNVL_IOCTL_WAIT);
+}
+
+int _pnvl_num_devs(void)
+{
+	return _pnvl_devs->num;
+}
+
+int _pnvl_fd(int id)
+{
+	if (id >= _pnvl_devs->num || id < 0)
+		return -1;
+	return _pnvl_devs->fds[id];
 }

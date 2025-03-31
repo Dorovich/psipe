@@ -31,41 +31,51 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 {
 	double t0, t1;
 
-	/* PNVL PART START ------------------------------------- */
-	_pnvl_open_devs();
-	/* PNVL PART END --------------------------------------- */
+	{ /* PNVL PART START =================================== */
+		_pnvl_open_devs();
+	} /* PNVL PART END ===================================== */
 
-	printf ("num_devs %d\n", _pnvl_devs->num);
+	printf ("num_devs %d\n", _pnvl_num_devs());
 	t0 = now();
 
-	/* PNVL PART START ------------------------------------- */
-	_pnvl_send_matmul_params_all(sz_n, sz_t, sz_m);
-	_pnvl_send_all(A, sz_n * sz_t * sizeof(TYPE));
-	_pnvl_send_all(B, sz_t * sz_m * sizeof(TYPE));
-	int offset = 0;
-	for (int i = 0; i < _pnvl_devs->num; ++i) {
-		int part = PART_FOR_DEV(i, sz_n * sz_m, _pnvl_devs->num);
-		int sz_part = part * sizeof(TYPE);
-		printf("Sending %d/%d elements to %d\n", part, sz_n * sz_m, i);
-		/*
-		_pnvl_asend(_pnvl_devs->fds[i], &C[offset], sz_part);
-		_pnvl_wait(_pnvl_devs->fds[i]);
-		*/
-		_pnvl_send(_pnvl_devs->fds[i], &C[offset], sz_part);
-		_pnvl_recv(_pnvl_devs->fds[i], &C[offset], sz_part);
-		offset += part;
-	}
-	/*
-	for (int i = 0; i < _pnvl_devs->num; ++i){
-		_pnvl_wait(_pnvl_devs->fds[i]);
-	*/
-	/* PNVL PART END --------------------------------------- */
+	{ /* PNVL PART START =================================== */
+		int rc, fd, num = _pnvl_num_devs();
+		int part, sz_part, tot_C = sz_n * sz_m, ofs = 0;
+
+		for (int i = 0; i < num; ++i) {
+			fd = _pnvl_fd(i);
+			part = PART_FOR_DEV(i, tot_C, num);
+			sz_part = part * sizeof(TYPE);
+
+			printf("Sending args to dev(%d): ", i);
+			rc = _pnvl_send_args(fd, sz_n, sz_t, sz_m, ofs, part);
+			printf("%d\n", rc);
+
+			printf("Sending A to dev(%d): ", i);
+			rc = _pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
+			printf("%d\n", rc);
+
+			printf("Sending B to dev(%d): ", i);
+			rc = _pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
+			printf("%d\n", rc);
+
+			printf("Sending %d/%d to dev(%d): ", part, tot_C, i);
+			rc = _pnvl_asend(fd, &C[ofs], sz_part);
+			printf("%d\n", rc);
+
+			printf("Waiting for dev(%d): ", i);
+			rc = _pnvl_wait(fd);
+			printf("%d\n", rc);
+
+			ofs += part;
+		}
+	} /* PNVL PART END ===================================== */
 
 	t1 = now();
 
-	/* PNVL PART START ------------------------------------- */
-	_pnvl_close_devs();
-	/* PNVL PART END --------------------------------------- */
+	{ /* PNVL PART START =================================== */
+		_pnvl_close_devs();
+	} /* PNVL PART END ===================================== */
 
 	show_time(msg, t0, t1);
 	printf("\nMatrices: ( %d %d ) x ( %d %d ) -> ( %d %d )\n",

@@ -13,6 +13,7 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	struct pnvl_data *data = &pnvl_dev->data;
 	int first_page, last_page, npages, pinned;
+	unsigned int flags;
 
 	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
 	last_page = ((data->addr + data->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
@@ -35,27 +36,33 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 	 * Hay que investigar más. Por ahora la función vma_lookup parecer
 	 * devolver un error.
 	 */
+	/*
 	{
-		unsigned long end;
-		check_add_overflow(data->addr, data->len, &end);
-		int t1 = end > TASK_SIZE_MAX; // gup.c - L3207
+		unsigned long start, start_u, start_ur, end, len;
+		int t1, t2, t3, t4;
 
-		unsigned long start = untagged_addr(data->addr) & PAGE_MASK;
-		unsigned long len = npages << PAGE_SHIFT;
-		int t2 = !access_ok((void __user *)start, len); // gup.c - L3209
+		t1 = check_add_overflow(data->addr, data->len, &end);
+		t2 = end > TASK_SIZE_MAX; // gup.c - L3207
+
+		start_u = untagged_addr(data->addr) & PAGE_MASK;
+		len = npages << PAGE_SHIFT;
+		t3 = !access_ok((void __user *)start_u, len); // gup.c - L3209
 
 		struct mm_struct *mm = current->mm;
-		struct vm_area_struct *vma = vma_lookup(mm, start);
-		int t3 = !vma; // gup.c - L1124
+		start_ur = untagged_addr_remote(mm, start);
+		struct vm_area_struct *vma = vma_lookup(mm, start_ur);
+		t4 = !vma; // gup.c - L1124
 
-		printk(KERN_INFO "tests - 1=%d, 2=%d, 3=%d\n", t1, t2, t3);
+		printk(KERN_INFO "test errors: 1=%d, 2=%d, 3=%d, 4=%d\n",
+				t1, t2, t3, t4);
 	}
+	*/
 	/* TESTING END */
 
-	pinned = pin_user_pages_fast(data->addr, npages, FOLL_LONGTERM,
-			dma->pages);
+	flags = (pnvl_dev->sending || pnvl_dev->recving) ? FOLL_LONGTERM : 0;
+	pinned = pin_user_pages_fast(data->addr, npages, flags, dma->pages);
 
-	printk(KERN_INFO "pinning userspace pages - returned %d\n", pinned);
+	printk(KERN_INFO "pin_user_pages_fast(%d)\n", pinned);
 
 	return -(pinned != npages);
 }

@@ -6,16 +6,16 @@ struct _pnvl_devices {
 	int *fds;
 };
 
+int _pnvl_arecv(int fd, void *addr, size_t len);
+int _pnvl_asend(int fd, void *addr, size_t len);
+int _pnvl_close_devs(void);
 int _pnvl_count_devs(void);
-void _pnvl_arecv(int fd, void *addr, size_t len);
-void _pnvl_asend(int fd, void *addr, size_t len);
-void _pnvl_close_devs(void);
-void _pnvl_open_devs(void);
-void _pnvl_recv(int fd, void *addr, size_t len);
-void _pnvl_recv_matmul_params(int fd, int *sz_n, int *sz_t, int *sz_m, int *g_len, int *g_ofs);
-void _pnvl_return(int fd);
-void _pnvl_send_all(void *addr, size_t len);
-void _pnvl_send(int fd, void *addr, size_t len);
-void _pnvl_send_matmul_params_all(int sz_n, int sz_t, int sz_m);
-void _pnvl_send_matmul_params(int fd, int sz_n, int sz_t, int sz_m);
-void _pnvl_wait(int fd);
+int _pnvl_fd(int id);
+int _pnvl_num_devs(void);
+int _pnvl_open_devs(void);
+int _pnvl_recv(int fd, void *addr, size_t len);
+int _pnvl_recv_args(int fd, int *sz_n, int *sz_t, int *sz_m, int *len, int *ofs);
+int _pnvl_return(int fd);
+int _pnvl_send(int fd, void *addr, size_t len);
+int _pnvl_send_args(int fd, int sz_n, int sz_t, int sz_m, int len, int ofs);
+int _pnvl_wait(int fd);
