@@ -39,33 +39,34 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 	t0 = now();
 
 	{ /* PNVL PART START =================================== */
-		int rc, fd, num = _pnvl_num_devs();
+		int rv, fd, num = _pnvl_num_devs();
 		int part, sz_part, tot_C = sz_n * sz_m, ofs = 0;
 
 		for (int i = 0; i < num; ++i) {
 			fd = _pnvl_fd(i);
 			part = PART_FOR_DEV(i, tot_C, num);
 			sz_part = part * sizeof(TYPE);
+			printf("dev=%d part=%d sz_part=%d\n", i, part, sz_part);
 
-			printf("Sending args to dev(%d): ", i);
-			rc = _pnvl_send_args(fd, sz_n, sz_t, sz_m, ofs, part);
-			printf("%d\n", rc);
+			rv = _pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
+			if (rv < 0)
+				perror("_pnvl_send_args");
 
-			printf("Sending A to dev(%d): ", i);
-			rc = _pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
-			printf("%d\n", rc);
+			rv = _pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
+			if (rv < 0)
+				perror("_pnvl_send(A)");
 
-			printf("Sending B to dev(%d): ", i);
-			rc = _pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
-			printf("%d\n", rc);
+			rv = _pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
+			if (rv < 0)
+				perror("_pnvl_send(B)");
 
-			printf("Sending %d/%d to dev(%d): ", part, tot_C, i);
-			rc = _pnvl_asend(fd, &C[ofs], sz_part);
-			printf("%d\n", rc);
+			rv = _pnvl_asend(fd, &C[ofs], sz_part);
+			if (rv < 0)
+				perror("_pnvl_asend(C)");
 
-			printf("Waiting for dev(%d): ", i);
-			rc = _pnvl_wait(fd);
-			printf("%d\n", rc);
+			rv = _pnvl_wait(fd);
+			if (rv < 0)
+				perror("_pnvl_wait)");
 
 			ofs += part;
 		}
@@ -95,7 +96,7 @@ void matrix_init(char * msg, int rows, int cols, TYPE (* mat)[cols],
 
 	// Repeat initialization 4 times to check if there is
 	// any timing variability
-	for (loop = 0; loop < 4; loop++) {
+	//for (loop = 0; loop < 4; loop++) {
 		//t0 = now();
 
 		for (i=0; i < rows; i++) {
@@ -109,7 +110,7 @@ void matrix_init(char * msg, int rows, int cols, TYPE (* mat)[cols],
 		//t1 = now();
 
 		//show_time(msg, t0, t1);
-	}
+	//}
 	//printf("\n");
 }
 

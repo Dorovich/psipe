@@ -121,7 +121,7 @@ static void pnvl_transfer_pages(PNVLDevice *dev)
 		return;
 
 	do {
-		printf("%lu bytes left\n", dev->dma.current.len_left);
+		//printf("%lu bytes left\n", dev->dma.current.len_left);
 		len = pnvl_dma_rx_page(dev);
 		ret = pnvl_proxy_tx_page(dev, dev->dma.buff, len);
 	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
@@ -139,7 +139,7 @@ static void pnvl_receive_pages(PNVLDevice *dev)
 		return;
 
 	do {
-		printf("%lu bytes left\n", dev->dma.current.len_left);
+		//printf("%lu bytes left\n", dev->dma.current.len_left);
 		len = pnvl_proxy_rx_page(dev, dev->dma.buff);
 		ret = pnvl_dma_tx_page(dev, len);
 	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));

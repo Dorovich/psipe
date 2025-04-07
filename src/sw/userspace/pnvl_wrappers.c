@@ -67,20 +67,20 @@ int _pnvl_open_devs(void)
 
 int _pnvl_recv_args(int fd, int *sz_n, int *sz_t, int *sz_m, int *len, int *ofs)
 {
-	int rc, params[5];
+	int rv, params[5];
 	struct pnvl_data data = {
 		.addr = (unsigned long)params,
 		.len = (unsigned long)sizeof(params),
 	};
 
-	rc = ioctl(fd, PNVL_IOCTL_RECV, &data);
+	rv = ioctl(fd, PNVL_IOCTL_RECV, &data);
 	*sz_n = params[0];
 	*sz_t = params[1];
 	*sz_m = params[2];
 	*len = params[3];
 	*ofs = params[4];
 
-	return rc;
+	return rv;
 }
 
 int _pnvl_recv(int fd, void *addr, size_t len)
@@ -94,13 +94,11 @@ int _pnvl_recv(int fd, void *addr, size_t len)
 
 int _pnvl_arecv(int fd, void *addr, size_t len)
 {
-	int rc;
-	struct pnvl_data *data = malloc(sizeof(*data));
-	data->addr = (unsigned long)addr;
-	data->len = (unsigned long)len;
-	rc = ioctl(fd, PNVL_IOCTL_ARECV, data);
-	free(data);
-	return rc;
+	struct pnvl_data data = {
+		.addr = (unsigned long)addr,
+		.len = (unsigned long)len,
+	};
+	return ioctl(fd, PNVL_IOCTL_ARECV, &data);
 }
 
 int _pnvl_return(int fd)
@@ -129,13 +127,11 @@ int _pnvl_send(int fd, void *addr, size_t len)
 
 int _pnvl_asend(int fd, void *addr, size_t len)
 {
-	int rc;
-	struct pnvl_data *data = malloc(sizeof(*data));
-	data->addr = (unsigned long)addr;
-	data->len = (unsigned long)len;
-	rc = ioctl(fd, PNVL_IOCTL_ASEND, data);
-	free(data);
-	return rc;
+	struct pnvl_data data = {
+		.addr = (unsigned long)addr,
+		.len = (unsigned long)len,
+	};
+	return ioctl(fd, PNVL_IOCTL_ASEND, &data);
 }
 
 int _pnvl_wait(int fd)

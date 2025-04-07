@@ -29,23 +29,35 @@ void matmul_func(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
 
 int main(int argc, char *argv[])
 {
-	int sz_n, sz_t, sz_m;
+	int sz_n, sz_t, sz_m, g_len, g_ofs, fd, rv;
 	TYPE *pt_A, *pt_B, *pt_C;
 	size_t sz_A, sz_B, sz_C;
-	_pnvl_open_devs();
-	int fd = _pnvl_devs->fds[0];
-	int g_len, g_ofs;
 
-	_pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
+	_pnvl_open_devs();
+	fd = _pnvl_devs->fds[0];
+
+	rv = _pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
+	if (rv < 0)
+		perror("_pnvl_recv_args");
+
 	sz_A = sz_n * sz_t * sizeof(TYPE);
 	sz_B = sz_t * sz_m * sizeof(TYPE);
 	sz_C = g_len * sizeof(TYPE);
 	pt_A = malloc(sz_A);
 	pt_B = malloc(sz_B);
 	pt_C = malloc(sz_C);
-	_pnvl_recv(fd, pt_A, sz_A);
-	_pnvl_recv(fd, pt_B, sz_B);
-	_pnvl_arecv(fd, pt_C, sz_C);
+
+	rv = _pnvl_recv(fd, pt_A, sz_A);
+	if (rv < 0)
+		perror("_pnvl_recv(A)");
+
+	rv = _pnvl_recv(fd, pt_B, sz_B);
+	if (rv < 0)
+		perror("_pnvl_recv(B)");
+
+	rv = _pnvl_arecv(fd, pt_C, sz_C);
+	if (rv < 0)
+		perror("_pnvl_arecv(C)");
 
 	TYPE (* __restrict__ A)[sz_t] = (TYPE (*)[sz_t])pt_A;
 	TYPE (* __restrict__ B)[sz_m] = (TYPE (*)[sz_m])pt_B;
@@ -63,7 +75,10 @@ int main(int argc, char *argv[])
 	}
 	/* FUNCTION END ---------------------------------------- */
 
-	_pnvl_return(fd);
+	rv = _pnvl_return(fd);
+	if (rv < 0)
+		perror("_pnvl_return");
+
 	_pnvl_close_devs();
 	free(pt_A);
 	free(pt_B);
