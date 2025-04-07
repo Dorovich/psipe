@@ -41,154 +41,28 @@ static int pnvl_open(struct inode *inode, struct file *fp)
 	return 0;
 }
 
-static bool pnvl_copy_data(struct pnvl_dev *pnvl_dev, unsigned long arg)
-{
-	struct pnvl_data *kdata = &pnvl_dev->data;
-	struct pnvl_data __user *udata = (void *)arg;
-	if (access_ok(udata, sizeof(*udata)))
-		return !copy_from_user(kdata, udata, sizeof(*kdata));
-	return 0;
-}
-
-static bool pnvl_check_size_fit(struct pnvl_dev *pnvl_dev)
+static inline bool pnvl_check_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
 	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 	return pnvl_dev->data.len <= len_avail;
 }
 
-static void pnvl_mode_active(struct pnvl_dev *pnvl_dev)
+static inline void pnvl_set_size_avail(struct pnvl_dev *pnvl_dev)
 {
-	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
-	pnvl_dev->sending = true;
-	pnvl_dev->recving = false;
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	u32 len = (u32)pnvl_dev->data.len;
+	iowrite32(len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 }
 
-static void pnvl_mode_passive(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
-	pnvl_dev->sending = false;
-	pnvl_dev->recving = true;
-}
-
-static void pnvl_mode_off(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->dma.mode = PNVL_MODE_OFF;
-	pnvl_dev->sending = false;
-	pnvl_dev->recving = false;
-}
-
-static int pnvl_ioctl_send(struct pnvl_dev *pnvl_dev, unsigned long arg)
-{
-	if (pnvl_dev->sending || pnvl_dev->recving)
-		return -EBUSY;
-	if (!pnvl_copy_data(pnvl_dev, arg))
-		return -EFAULT;
-
-	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
-	pnvl_dma_write_config(pnvl_dev);
-
-	if (!pnvl_check_size_fit(pnvl_dev))
-		return -EMSGSIZE;
-	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
-		goto send_err_pin;
-	if (pnvl_dma_map_pages(pnvl_dev) < 0)
-		goto send_err_map;
-
-	pnvl_dma_write_mappings(pnvl_dev);
-	pnvl_dma_doorbell_ring(pnvl_dev);
-	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_unmap_pages(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-	pnvl_mode_off(pnvl_dev);
-
-	return 0;
-
-send_err_map:
-	pnvl_dma_unpin_pages(pnvl_dev);
-send_err_pin:
-	return -ENOMEM;
-}
-
-static int pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, unsigned long arg)
-{
-	if (pnvl_dev->sending || pnvl_dev->recving)
-		return -EBUSY;
-	if (!pnvl_copy_data(pnvl_dev, arg))
-		return -EFAULT;
-
-	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
-	pnvl_dma_write_config(pnvl_dev);
-
-	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
-		goto recv_err_pin;
-	if (pnvl_dma_map_pages(pnvl_dev) < 0)
-		goto recv_err_map;
-
-	pnvl_dma_write_mappings(pnvl_dev);
-	pnvl_dma_doorbell_ring(pnvl_dev);
-	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_unmap_pages(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-	pnvl_mode_off(pnvl_dev);
-
-	return 0;
-
-recv_err_map:
-	pnvl_dma_unpin_pages(pnvl_dev);
-recv_err_pin:
-	return -ENOMEM;
-}
-
-static int pnvl_ioctl_asend(struct pnvl_dev *pnvl_dev, unsigned long arg)
-{
-	if (pnvl_dev->sending || pnvl_dev->recving)
-		return -EBUSY;
-	if (!pnvl_copy_data(pnvl_dev, arg)) {
-		printk(KERN_INFO "pnvl_copy_data - failed");
-		return -EFAULT;
-	}
-
-	printk(KERN_INFO "test1\n");
-	pnvl_mode_active(pnvl_dev);
-	pnvl_dma_write_config(pnvl_dev);
-
-	printk(KERN_INFO "test2\n");
-	if (!pnvl_check_size_fit(pnvl_dev))
-		return -EMSGSIZE;
-	printk(KERN_INFO "test3\n");
-	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
-		goto asend_err_pin;
-	printk(KERN_INFO "test4\n");
-	if (pnvl_dma_map_pages(pnvl_dev) < 0)
-		goto asend_err_map;
-
-	printk(KERN_INFO "test5\n");
-	pnvl_dma_write_mappings(pnvl_dev);
-	pnvl_dma_doorbell_ring(pnvl_dev);
-
-	printk(KERN_INFO "test6\n");
-	return 0;
-
-asend_err_map:
-	pnvl_dma_unpin_pages(pnvl_dev);
-asend_err_pin:
-	return -ENOMEM;
-}
-
-static int pnvl_ioctl_arecv(struct pnvl_dev *pnvl_dev, unsigned long arg)
+static long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev)
 {
 	int rv;
 
-	if (pnvl_dev->sending || pnvl_dev->recving)
-		return -EBUSY;
+	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
 
-	rv = pnvl_copy_data(pnvl_dev, arg);
-	if (!rv)
-		return -EFAULT;
-
-	pnvl_mode_passive(pnvl_dev);
-	pnvl_dma_write_config(pnvl_dev);
+	if (!pnvl_check_size_avail(pnvl_dev))
+		return -EMSGSIZE;
 
 	rv = pnvl_dma_pin_pages(pnvl_dev);
 	if (rv < 0)
@@ -200,42 +74,43 @@ static int pnvl_ioctl_arecv(struct pnvl_dev *pnvl_dev, unsigned long arg)
 		return rv;
 	}
 
-	pnvl_dma_write_mappings(pnvl_dev);
+	pnvl_dma_write_config(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
-	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
 
 	return 0;
 }
 
-static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
+static long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
 {
-	if (!pnvl_dev->sending)
-		return -EINVAL;
-
-	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_unmap_pages(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-	pnvl_mode_off(pnvl_dev);
-
-	return 0;
-}
-
-static int pnvl_ioctl_return(struct pnvl_dev *pnvl_dev)
 {
-	if (!pnvl_dev->recving)
-		return -EINVAL;
-	if (pnvl_dma_pin_pages(pnvl_dev) < 0) {
-		pnvl_mode_off(pnvl_dev);
-		return -ENOMEM;
+	int rv;
+
+	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
+
+	pnvl_set_size_avail(pnvl_dev);
+
+	rv = pnvl_dma_pin_pages(pnvl_dev);
+	if (rv < 0)
+		return rv;
+
+	rv = pnvl_dma_map_pages(pnvl_dev);
+	if (rv < 0) {
+		pnvl_dma_unpin_pages(pnvl_dev);
+		return rv;
 	}
 
-	pnvl_mode_active(pnvl_dev);
+	pnvl_dma_write_config(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
+
+	return 0;
+}
+}
+
+static long pnvl_ioctl_barrier(struct pnvl_dev *pnvl_dev)
+{
 	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_unmap_pages(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-	pnvl_mode_off(pnvl_dev);
+
+	pnvl_dev->dma.mode = PNVL_MODE_OFF;
 
 	return 0;
 }
@@ -243,25 +118,37 @@ static int pnvl_ioctl_return(struct pnvl_dev *pnvl_dev)
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
+	struct pnvl_data __user *udata = (void *)arg;
 
 	switch(cmd) {
 	case PNVL_IOCTL_SEND:
-		return pnvl_ioctl_send(pnvl_dev, arg);
 	case PNVL_IOCTL_RECV:
-		return pnvl_ioctl_recv(pnvl_dev, arg);
-	case PNVL_IOCTL_ASEND:
-		return pnvl_ioctl_asend(pnvl_dev, arg);
-	case PNVL_IOCTL_ARECV:
-		return pnvl_ioctl_arecv(pnvl_dev, arg);
-	case PNVL_IOCTL_WAIT:
-		return pnvl_ioctl_wait(pnvl_dev);
-	case PNVL_IOCTL_RETURN:
-		return pnvl_ioctl_return(pnvl_dev);
+		if (is_busy(pnvl_dev))
+			return -EBUSY;
+		if (copy_from_user(&pnvl_dev->data, udata, sizeof(*udata)) > 0)
+			return -EFAULT;
+		break;
+	case PNVL_IOCTL_BARRIER:
+		if (!is_busy(pnvl_dev))
+			return -EINVAL;
+		break;
 	default:
-		return -ENOTTY;
+		goto fail;
 	}
 
-	return 0;
+	switch(cmd) {
+	case PNVL_IOCTL_SEND:
+		return pnvl_ioctl_send(pnvl_dev);
+	case PNVL_IOCTL_RECV:
+		return pnvl_ioctl_recv(pnvl_dev);
+	case PNVL_IOCTL_BARRIER:
+		return pnvl_ioctl_barrier(pnvl_dev);
+	default:
+		goto fail;
+	}
+
+fail:
+	return -ENOTTY;
 }
 
 static const struct file_operations pnvl_fops = {
@@ -300,7 +187,7 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	init_waitqueue_head(&pnvl_dev->wq);
 
 	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
-	pnvl_mode_off(pnvl_dev);
+	pnvl_dev->dma.mode = PNVL_MODE_OFF;
 
 	return 0;
 }

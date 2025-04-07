@@ -99,24 +99,10 @@ void pnvl_dma_write_config(struct pnvl_dev *pnvl_dev)
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	struct pnvl_data *data = &pnvl_dev->data;
 	void __iomem *mmio = pnvl_dev->bar.mmio;
-	bool ret_data = pnvl_dev->sending || pnvl_dev->recving;
-
-	if (dma->mode == PNVL_MODE_PASSIVE) {
-		iowrite32((u32)data->len,
-				mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
-	}
+	unsigned int ofs = 0;
 
 	iowrite32((u32)data->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
 	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
-	iowrite32((u32)ret_data, mmio + PNVL_HW_BAR0_RETURN);
-}
-
-void pnvl_dma_write_mappings(struct pnvl_dev *pnvl_dev)
-{
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	unsigned int ofs = 0;
-
 	iowrite32((u32)dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 
 	for (int i = 0; i < dma->npages; ++i) {

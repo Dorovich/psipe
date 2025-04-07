@@ -28,14 +28,8 @@ typedef struct PNVLDeviceClass {
 	PCIDeviceClass parent_class;
 } PNVLDeviceClass;
 
-typedef struct ReturnStatus {
-	bool active; // return results in passive mode
-	bool swap; // swap active status on next call
-} ReturnStatus;
-
 typedef struct PNVLDevice {
 	PCIDevice pci_dev;
-	ReturnStatus ret;
 	IRQStatus irq;
 	DMAEngine dma;
 	MemoryRegion mmio;

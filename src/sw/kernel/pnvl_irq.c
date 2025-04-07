@@ -18,14 +18,13 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 	struct pnvl_dev *pnvl_dev = data;
 
 	pnvl_irq_ack(pnvl_dev);
+	pnvl_dma_unmap_pages(pnvl_dev);
+	pnvl_dma_unpin_pages(pnvl_dev);
 	pnvl_dma_wake(pnvl_dev);
 
 	/*
 	dev_dbg(&pnvl_dev->pdev->dev, "irq_handler irq = %d dev = %d\n", irq,
 		pnvl_dev->major);
-
-	printk(KERN_INFO "pnvl interrupt received - handling (major %d, minor %d)\n",
-			pnvl_dev->major, pnvl_dev->minor);
 	*/
 
 	return IRQ_HANDLED;

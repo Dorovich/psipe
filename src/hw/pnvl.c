@@ -158,23 +158,13 @@ void pnvl_execute(PNVLDevice *dev)
 	switch(dev->dma.mode) {
 	case DMA_MODE_ACTIVE:
 		pnvl_transfer_pages(dev);
-		if (dev->ret.active)
-			pnvl_receive_pages(dev);
 		break;
 	case DMA_MODE_PASSIVE:
-		if (dev->ret.active && dev->ret.swap) {
-			dev->ret.active = false;
-			dev->ret.swap = false;
-			pnvl_transfer_pages(dev);
-		} else {
-			dev->ret.swap = dev->ret.active;
-			pnvl_proxy_await_req(dev, PNVL_REQ_SLN);
-			pnvl_receive_pages(dev);
-		}
+		pnvl_proxy_await_req(dev, PNVL_REQ_SLN);
+		pnvl_receive_pages(dev);
 		break;
 	default:
 		return;
 	}
 	pnvl_irq_raise(dev, PNVL_HW_IRQ_WORK_ENDED_VECTOR);
-	printf("IRQ RAISED\n");
 }
