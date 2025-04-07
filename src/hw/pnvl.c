@@ -24,8 +24,6 @@ static void pnvl_device_init(PCIDevice *pci_dev, Error **errp)
 	pnvl_dma_init(dev, errp);
 	pnvl_mmio_init(dev, errp);
 	pnvl_proxy_init(dev, errp);
-	dev->ret.active = false;
-	dev->ret.swap = false;
 }
 
 static void pnvl_device_fini(PCIDevice *pci_dev)
@@ -44,8 +42,6 @@ static void pnvl_device_reset(DeviceState *dev_st)
 	pnvl_dma_reset(dev);
 	pnvl_mmio_reset(dev);
 	pnvl_proxy_reset(dev);
-	dev->ret.active = false;
-	dev->ret.swap = false;
 }
 
 /* ============================================================================

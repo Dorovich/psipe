@@ -51,22 +51,30 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			rv = _pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
 			if (rv < 0)
 				perror("_pnvl_send_args");
+			rv = _pnvl_barrier(fd);
+			if (rv < 0)
+				perror("_pnvl_barrier(args)");
 
 			rv = _pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
 			if (rv < 0)
 				perror("_pnvl_send(A)");
+			rv = _pnvl_barrier(fd);
+			if (rv < 0)
+				perror("_pnvl_barrier(A)");
 
 			rv = _pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
 			if (rv < 0)
 				perror("_pnvl_send(B)");
-
-			rv = _pnvl_asend(fd, &C[ofs], sz_part);
+			rv = _pnvl_barrier(fd);
 			if (rv < 0)
-				perror("_pnvl_asend(C)");
+				perror("_pnvl_barrier(B)");
 
-			rv = _pnvl_wait(fd);
+			rv = _pnvl_send(fd, &C[ofs], sz_part);
 			if (rv < 0)
-				perror("_pnvl_wait)");
+				perror("_pnvl_send(C)");
+			rv = _pnvl_barrier(fd);
+			if (rv < 0)
+				perror("_pnvl_barrier(C)");
 
 			ofs += part;
 		}
@@ -91,7 +99,8 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 void matrix_init(char * msg, int rows, int cols, TYPE (* mat)[cols],
 		TYPE random)
 {
-	int loop, i, j;
+	//int loop, i, j;
+	int i, j;
 	//double t0, t1;
 
 	// Repeat initialization 4 times to check if there is

@@ -82,7 +82,6 @@ static long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev)
 
 static long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
 {
-{
 	int rv;
 
 	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
@@ -104,13 +103,10 @@ static long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
 
 	return 0;
 }
-}
 
 static long pnvl_ioctl_barrier(struct pnvl_dev *pnvl_dev)
 {
 	pnvl_dma_wait(pnvl_dev);
-
-	pnvl_dev->dma.mode = PNVL_MODE_OFF;
 
 	return 0;
 }

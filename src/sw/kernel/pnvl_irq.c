@@ -18,8 +18,11 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 	struct pnvl_dev *pnvl_dev = data;
 
 	pnvl_irq_ack(pnvl_dev);
+
 	pnvl_dma_unmap_pages(pnvl_dev);
 	pnvl_dma_unpin_pages(pnvl_dev);
+	pnvl_dev->dma.mode = PNVL_MODE_OFF;
+
 	pnvl_dma_wake(pnvl_dev);
 
 	/*
