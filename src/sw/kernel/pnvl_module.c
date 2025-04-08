@@ -45,13 +45,13 @@ static inline bool pnvl_check_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
 	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
-	return pnvl_dev->data.len <= len_avail;
+	return pnvl_dev->dma.len <= len_avail;
 }
 
 static inline void pnvl_set_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
-	u32 len = (u32)pnvl_dev->data.len;
+	u32 len = (u32)pnvl_dev->dma.len;
 	iowrite32(len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 }
 
@@ -114,15 +114,13 @@ static long pnvl_ioctl_barrier(struct pnvl_dev *pnvl_dev)
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
-	struct pnvl_data __user *udata = (void *)arg;
 
 	switch(cmd) {
 	case PNVL_IOCTL_SEND:
 	case PNVL_IOCTL_RECV:
 		if (is_busy(pnvl_dev))
 			return -EBUSY;
-		if (copy_from_user(&pnvl_dev->data, udata, sizeof(*udata)) > 0)
-			return -EFAULT;
+		pnvl_queue_new(cmd, arg);
 		break;
 	case PNVL_IOCTL_BARRIER:
 		if (!is_busy(pnvl_dev))
@@ -287,7 +285,8 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_irq_enable;
 	}
 
-	memset(&pnvl_dev->data, 0, sizeof(pnvl_dev->data));
+	mutex_init(&pnvl_dev->ops.lock);
+	INIT_LIST_HEAD(&pnvl_dev->ops.queue);
 
 	dev_info(&pdev->dev, "pnvl probe - success\n");
 
