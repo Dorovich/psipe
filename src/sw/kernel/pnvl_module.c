@@ -114,35 +114,34 @@ static long pnvl_ioctl_barrier(struct pnvl_dev *pnvl_dev)
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
+	bool empty = (pnvl_op_first(&pnvl_dev->ops) == NULL);
+	int rv = -ENOTTY;
 
 	switch(cmd) {
 	case PNVL_IOCTL_SEND:
+		rv = pnvl_op_add(&pnvl_dev->ops, cmd, arg);
+		if (rv < 0)
+			goto out;
+		if (empty)
+			rv = pnvl_ioctl_send(pnvl_dev);
+		break;
 	case PNVL_IOCTL_RECV:
-		if (is_busy(pnvl_dev))
-			return -EBUSY;
-		pnvl_queue_new(cmd, arg);
+		rv = pnvl_op_add(&pnvl_dev->ops, cmd, arg);
+		if (rv < 0)
+			goto out;
+		if (empty)
+			rv = pnvl_ioctl_recv(pnvl_dev);
 		break;
 	case PNVL_IOCTL_BARRIER:
-		if (!is_busy(pnvl_dev))
-			return -EINVAL;
+		if (empty)
+			rv = -EINVAL;
+		else
+			rv = pnvl_op_wait(/* op */);
 		break;
-	default:
-		goto fail;
 	}
 
-	switch(cmd) {
-	case PNVL_IOCTL_SEND:
-		return pnvl_ioctl_send(pnvl_dev);
-	case PNVL_IOCTL_RECV:
-		return pnvl_ioctl_recv(pnvl_dev);
-	case PNVL_IOCTL_BARRIER:
-		return pnvl_ioctl_barrier(pnvl_dev);
-	default:
-		goto fail;
-	}
-
-fail:
-	return -ENOTTY;
+out:
+	return rv;
 }
 
 static const struct file_operations pnvl_fops = {

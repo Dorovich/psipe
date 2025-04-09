@@ -105,6 +105,7 @@ void pnvl_dma_unpin_pages(struct pnvl_dev *pnvl_dev)
 	kfree(dma->pages);
 }
 
+/*
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev)
 {
 	if (!pnvl_dev->wq_flag)
@@ -117,3 +118,4 @@ void pnvl_dma_wake(struct pnvl_dev *pnvl_dev)
 	pnvl_dev->wq_flag = 1;
 	wake_up(&pnvl_dev->wq);
 }
+*/

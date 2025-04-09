@@ -19,17 +19,17 @@
 #define PNVL_MODE_PASSIVE 0
 #define PNVL_MODE_OFF -1
 
-#define is_busy(pnvl_dev) (pnvl_dev->dma.mode != PNVL_MODE_OFF)
+typedef pnvl_handle_t unsigned long
 
 struct pnvl_op {
 	struct list_head list;
 	wait_queue_head_t waitq;
 	int flag; // for the wait queue
 	unsigned int command; // PNVL_IOCTL_SEND or PNVL_IOCTL_RECV (for now)
-	struct pnvl_data __user *data_ptr;
+	unsigned long uarg;
 };
 
-struct pnvl_dev; /* forward declaration */
+//struct pnvl_dev; /* forward declaration */
 
 struct pnvl_bar {
 	u64 start;
@@ -75,12 +75,16 @@ int pnvl_dma_map_pages(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_unmap_pages(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_write_config(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
+/*
 void pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_wake(struct pnvl_dev *pnvl_dev);
+*/
 
-int pnvl_queue_new(unsigned int cmd, struct pnvl_data __user *data);
-struct pnvl_op *pnvl_queue_first(void);
-int pnvl_queue_step(struct pnvl_op *op);
+int pnvl_op_add(struct pnvl_ops *ops, unsigned int cmd, unsigned long uarg);
+struct pnvl_op *pnvl_op_first(struct pnvl_ops *ops);
+int pnvl_op_step(struct pnvl_ops *ops, struct pnvl_op *op);
+void pnvl_op_wait(struct pnvl_op *op);
+int pnvl_op_setup(struct pnvl_dev *pnvl_dev, struct pnvl_op *op);
 
 int pnvl_irq_enable(struct pnvl_dev *pnvl_dev);
 
