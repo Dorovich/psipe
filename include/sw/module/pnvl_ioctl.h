@@ -15,4 +15,4 @@ struct pnvl_data {
 
 #define PNVL_IOCTL_SEND _IOW(PNVL_IOCTL_MAGIC, 1, struct pnvl_data *)
 #define PNVL_IOCTL_RECV _IOW(PNVL_IOCTL_MAGIC, 2, struct pnvl_data *)
-#define PNVL_IOCTL_BARRIER _IO(PNVL_IOCTL_MAGIC, 3)
+#define PNVL_IOCTL_WAIT _IO(PNVL_IOCTL_MAGIC, 3)

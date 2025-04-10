@@ -29,26 +29,28 @@ MODULE_DEVICE_TABLE(pci, pnvl_id_table);
 static int pnvl_open(struct inode *inode, struct file *fp)
 {
 	unsigned int bar = iminor(inode);
-	struct pnvl_dev *pnvl_dev = container_of(inode->i_cdev,
-						struct pnvl_dev, cdev);
+	struct pnvl_dev *pnvl_dev;
+
+	pnvl_dev = container_of(inode->i_cdev, struct pnvl_dev, cdev);
 
 	if (bar != 0)
 		return -ENXIO;
 	if (pnvl_dev->bar.len == 0)
 		return -EIO;
+
 	fp->private_data = pnvl_dev;
 
 	return 0;
 }
 
-static inline bool pnvl_check_size_avail(struct pnvl_dev *pnvl_dev)
+static bool pnvl_check_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
 	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 	return pnvl_dev->dma.len <= len_avail;
 }
 
-static inline void pnvl_set_size_avail(struct pnvl_dev *pnvl_dev)
+static void pnvl_set_size_avail(struct pnvl_dev *pnvl_dev)
 {
 	void __iomem *mmio = pnvl_dev->bar.mmio;
 	u32 len = (u32)pnvl_dev->dma.len;
@@ -58,8 +60,6 @@ static inline void pnvl_set_size_avail(struct pnvl_dev *pnvl_dev)
 static long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev)
 {
 	int rv;
-
-	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
 
 	if (!pnvl_check_size_avail(pnvl_dev))
 		return -EMSGSIZE;
@@ -84,8 +84,6 @@ static long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
 {
 	int rv;
 
-	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
-
 	pnvl_set_size_avail(pnvl_dev);
 
 	rv = pnvl_dma_pin_pages(pnvl_dev);
@@ -104,44 +102,59 @@ static long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
 	return 0;
 }
 
-static long pnvl_ioctl_barrier(struct pnvl_dev *pnvl_dev)
+long pnvl_ioctl_run(struct pnvl_dev *pnvl_dev, unsigned int cmd)
 {
-	pnvl_dma_wait(pnvl_dev);
-
-	return 0;
+	switch(cmd) {
+	case PNVL_IOCTL_SEND:
+		return pnvl_ioctl_send(pnvl_dev);
+	case PNVL_IOCTL_RECV:
+		return pnvl_ioctl_recv(pnvl_dev);
+	}
+	return -ENOTTY;
 }
 
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
-	bool empty = (pnvl_op_first(&pnvl_dev->ops) == NULL);
+	struct pnvl_ops *ops = &pnvl_dev->ops;
+	struct pnvl_op *op;
+	pnvl_handle_t id;
+	bool empty = !pnvl_op_first(ops);
 	int rv = -ENOTTY;
 
 	switch(cmd) {
 	case PNVL_IOCTL_SEND:
-		rv = pnvl_op_add(&pnvl_dev->ops, cmd, arg);
+		op = pnvl_op_new(PNVL_IOCTL_SEND, arg);
+		id = pnvl_op_add(ops, op);
+		rv = (int)id;
+		if (rv < 0 || !empty)
+			goto out;
+		rv = pnvl_op_setup(pnvl_dev, op);
 		if (rv < 0)
 			goto out;
-		if (empty)
-			rv = pnvl_ioctl_send(pnvl_dev);
-		break;
+		return pnvl_ioctl_send(pnvl_dev);
 	case PNVL_IOCTL_RECV:
-		rv = pnvl_op_add(&pnvl_dev->ops, cmd, arg);
+		op = pnvl_op_new(PNVL_IOCTL_SEND, arg);
+		id = pnvl_op_add(ops, op);
+		rv = (int)id;
+		if (rv < 0 || !empty)
+			goto out;
+		rv = pnvl_op_setup(pnvl_dev, op);
 		if (rv < 0)
 			goto out;
-		if (empty)
-			rv = pnvl_ioctl_recv(pnvl_dev);
-		break;
-	case PNVL_IOCTL_BARRIER:
-		if (empty)
-			rv = -EINVAL;
-		else
-			rv = pnvl_op_wait(/* op */);
+		return pnvl_ioctl_recv(pnvl_dev);
+	case PNVL_IOCTL_WAIT:
+		rv = empty ? -EINVAL : 0;
+		if (rv < 0)
+			goto out;
+		id = (pnvl_handle_t)arg;
+		op = pnvl_op_get(ops, id);
+		pnvl_op_wait(op);
 		break;
 	}
 
 out:
-	return rv;
+	return rv < 0 ? rv : id;
 }
 
 static const struct file_operations pnvl_fops = {
@@ -176,10 +189,10 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	}
 	pci_set_drvdata(pdev, pnvl_dev);
 
-	pnvl_dev->wq_flag = 0;
-	init_waitqueue_head(&pnvl_dev->wq);
+	mutex_init(&pnvl_dev->ops.lock);
+	INIT_LIST_HEAD(&pnvl_dev->ops.queue);
+	pnvl_dev->ops.next_id = 0;
 
-	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
 	pnvl_dev->dma.mode = PNVL_MODE_OFF;
 
 	return 0;
@@ -283,9 +296,6 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		dev_err(&pdev->dev, "pnvl_irq_enable failed\n");
 		goto err_irq_enable;
 	}
-
-	mutex_init(&pnvl_dev->ops.lock);
-	INIT_LIST_HEAD(&pnvl_dev->ops.queue);
 
 	dev_info(&pdev->dev, "pnvl probe - success\n");
 

@@ -19,12 +19,14 @@
 #define PNVL_MODE_PASSIVE 0
 #define PNVL_MODE_OFF -1
 
-typedef pnvl_handle_t unsigned long
+typedef unsigned long pnvl_handle_t;
 
 struct pnvl_op {
 	struct list_head list;
 	wait_queue_head_t waitq;
+	int nwaiting;
 	int flag; // for the wait queue
+	pnvl_handle_t id;
 	unsigned int command; // PNVL_IOCTL_SEND or PNVL_IOCTL_RECV (for now)
 	unsigned long uarg;
 };
@@ -56,8 +58,9 @@ struct pnvl_irq {
 
 struct pnvl_ops {
 	struct list_head queue;
-	struct mutex lock;
-}
+	struct mutex lock; // to lock accesses to queue
+	pnvl_handle_t next_id; // to identify an op
+};
 
 struct pnvl_dev {
 	struct pci_dev *pdev;
@@ -75,16 +78,16 @@ int pnvl_dma_map_pages(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_unmap_pages(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_write_config(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
-/*
-void pnvl_dma_wait(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_wake(struct pnvl_dev *pnvl_dev);
-*/
 
-int pnvl_op_add(struct pnvl_ops *ops, unsigned int cmd, unsigned long uarg);
+struct pnvl_op *pnvl_op_new(unsigned int cmd, unsigned long uarg);
+pnvl_handle_t pnvl_op_add(struct pnvl_ops *ops, struct pnvl_op *op);
 struct pnvl_op *pnvl_op_first(struct pnvl_ops *ops);
-int pnvl_op_step(struct pnvl_ops *ops, struct pnvl_op *op);
 void pnvl_op_wait(struct pnvl_op *op);
 int pnvl_op_setup(struct pnvl_dev *pnvl_dev, struct pnvl_op *op);
+void pnvl_op_next(struct pnvl_dev *pnvl_dev);
+struct pnvl_op *pnvl_op_get(struct pnvl_ops *ops, pnvl_handle_t id);
+
+long pnvl_ioctl_run(struct pnvl_dev *pnvl_dev, unsigned int cmd);
 
 int pnvl_irq_enable(struct pnvl_dev *pnvl_dev);
 

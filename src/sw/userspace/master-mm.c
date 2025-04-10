@@ -51,30 +51,30 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			rv = _pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
 			if (rv < 0)
 				perror("_pnvl_send_args");
-			rv = _pnvl_barrier(fd);
+			rv = _pnvl_wait(fd);
 			if (rv < 0)
-				perror("_pnvl_barrier(args)");
+				perror("_pnvl_wait(args)");
 
 			rv = _pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
 			if (rv < 0)
 				perror("_pnvl_send(A)");
-			rv = _pnvl_barrier(fd);
+			rv = _pnvl_wait(fd);
 			if (rv < 0)
-				perror("_pnvl_barrier(A)");
+				perror("_pnvl_wait(A)");
 
 			rv = _pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
 			if (rv < 0)
 				perror("_pnvl_send(B)");
-			rv = _pnvl_barrier(fd);
+			rv = _pnvl_wait(fd);
 			if (rv < 0)
-				perror("_pnvl_barrier(B)");
+				perror("_pnvl_wait(B)");
 
 			rv = _pnvl_send(fd, &C[ofs], sz_part);
 			if (rv < 0)
 				perror("_pnvl_send(C)");
-			rv = _pnvl_barrier(fd);
+			rv = _pnvl_wait(fd);
 			if (rv < 0)
-				perror("_pnvl_barrier(C)");
+				perror("_pnvl_wait(C)");
 
 			ofs += part;
 		}

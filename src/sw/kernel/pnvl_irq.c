@@ -19,11 +19,7 @@ static irqreturn_t pnvl_irq_handler(int irq, void *data)
 
 	pnvl_irq_ack(pnvl_dev);
 
-	pnvl_dma_unmap_pages(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-	pnvl_dev->dma.mode = PNVL_MODE_OFF;
-
-	pnvl_dma_wake(pnvl_dev);
+	pnvl_op_next(pnvl_dev);
 
 	/*
 	dev_dbg(&pnvl_dev->pdev->dev, "irq_handler irq = %d dev = %d\n", irq,

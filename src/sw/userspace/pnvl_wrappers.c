@@ -95,9 +95,9 @@ int _pnvl_recv(int fd, void *addr, size_t len)
 	return ioctl(fd, PNVL_IOCTL_RECV, &data);
 }
 
-int _pnvl_barrier(int fd)
+int _pnvl_wait(int fd)
 {
-	return ioctl(fd, PNVL_IOCTL_BARRIER);
+	return ioctl(fd, PNVL_IOCTL_WAIT);
 }
 
 int _pnvl_send_args(int fd, int sz_n, int sz_t, int sz_m, int len, int ofs)

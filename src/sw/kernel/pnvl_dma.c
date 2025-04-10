@@ -12,7 +12,7 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	int first_page, last_page, npages, pinned, rv;
-	unsigned int ofs;
+	unsigned ofs;
 
 	ofs = dma->addr & ~PAGE_MASK;
 	first_page = (dma->addr & PAGE_MASK) >> PAGE_SHIFT;
@@ -60,7 +60,9 @@ int pnvl_dma_map_pages(struct pnvl_dev *pnvl_dev)
 	dma->nmapped = dma_map_sg(&pnvl_dev->pdev->dev, dma->sgt->sgl,
 			dma->sgt->nents, dma->direction);
 
-	printk(KERN_INFO "dma_map_sg: created %d DMA mappings\n", dma->nmapped);
+	printk(KERN_INFO "dma_map_sg: created %lu mappings\n", dma->nmapped);
+
+	return (int)dma->nmapped;
 }
 
 void pnvl_dma_write_config(struct pnvl_dev *pnvl_dev)
@@ -69,7 +71,7 @@ void pnvl_dma_write_config(struct pnvl_dev *pnvl_dev)
 	void __iomem *mmio = pnvl_dev->bar.mmio;
 	dma_addr_t handle;
 	struct scatterlist *sg;
-	unsigned int ofs = 0;
+	unsigned ofs = 0;
 	int i;
 
 	iowrite32((u32)dma->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
@@ -104,18 +106,3 @@ void pnvl_dma_unpin_pages(struct pnvl_dev *pnvl_dev)
 	unpin_user_pages(dma->pages, dma->npages);
 	kfree(dma->pages);
 }
-
-/*
-void pnvl_dma_wait(struct pnvl_dev *pnvl_dev)
-{
-	if (!pnvl_dev->wq_flag)
-		wait_event(pnvl_dev->wq, pnvl_dev->wq_flag == 1);
-	pnvl_dev->wq_flag = 0;
-}
-
-void pnvl_dma_wake(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->wq_flag = 1;
-	wake_up(&pnvl_dev->wq);
-}
-*/

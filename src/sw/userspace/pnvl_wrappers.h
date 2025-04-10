@@ -12,6 +12,6 @@ int _pnvl_open_devs(void);
 int _pnvl_close_devs(void);
 int _pnvl_send(int fd, void *addr, size_t len);
 int _pnvl_recv(int fd, void *addr, size_t len);
-int _pnvl_barrier(int fd);
+int _pnvl_wait(int fd);
 int _pnvl_send_args(int fd, int sz_n, int sz_t, int sz_m, int len, int ofs);
 int _pnvl_recv_args(int fd, int *sz_n, int *sz_t, int *sz_m, int *len, int *ofs);

@@ -39,9 +39,9 @@ int main(int argc, char *argv[])
 	rv = _pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
 	if (rv < 0)
 		perror("_pnvl_recv_args");
-	rv = _pnvl_barrier(fd);
+	rv = _pnvl_wait(fd);
 	if (rv < 0)
-		perror("_pnvl_barrier(args)");
+		perror("_pnvl_wait(args)");
 
 	sz_A = sz_n * sz_t * sizeof(TYPE);
 	sz_B = sz_t * sz_m * sizeof(TYPE);
@@ -53,23 +53,23 @@ int main(int argc, char *argv[])
 	rv = _pnvl_recv(fd, pt_A, sz_A);
 	if (rv < 0)
 		perror("_pnvl_recv(A)");
-	rv = _pnvl_barrier(fd);
+	rv = _pnvl_wait(fd);
 	if (rv < 0)
-		perror("_pnvl_barrier(A)");
+		perror("_pnvl_wait(A)");
 
 	rv = _pnvl_recv(fd, pt_B, sz_B);
 	if (rv < 0)
 		perror("_pnvl_recv(B)");
-	rv = _pnvl_barrier(fd);
+	rv = _pnvl_wait(fd);
 	if (rv < 0)
-		perror("_pnvl_barrier(B)");
+		perror("_pnvl_wait(B)");
 
 	rv = _pnvl_recv(fd, pt_C, sz_C);
 	if (rv < 0)
 		perror("_pnvl_recv(C)");
-	rv = _pnvl_barrier(fd);
+	rv = _pnvl_wait(fd);
 	if (rv < 0)
-		perror("_pnvl_barrier(C)");
+		perror("_pnvl_wait(C)");
 
 	TYPE (* __restrict__ A)[sz_t] = (TYPE (*)[sz_t])pt_A;
 	TYPE (* __restrict__ B)[sz_m] = (TYPE (*)[sz_m])pt_B;
@@ -90,9 +90,9 @@ int main(int argc, char *argv[])
 	rv = _pnvl_send(fd, pt_C, sz_C);
 	if (rv < 0)
 		perror("_pnvl_send(C)");
-	rv = _pnvl_barrier(fd);
+	rv = _pnvl_wait(fd);
 	if (rv < 0)
-		perror("_pnvl_barrier(C)");
+		perror("_pnvl_wait(C)");
 
 	_pnvl_close_devs();
 	free(pt_A);
