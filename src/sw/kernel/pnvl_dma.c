@@ -37,6 +37,7 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 		goto unpin_pages;
 	}
 
+	// TODO: maybe specify DMA segment size for scatterlist?
 	rv = sg_alloc_table_from_pages(dma->sgt, dma->pages, npages, ofs,
 			dma->len, GFP_KERNEL);
 	if (rv < 0)

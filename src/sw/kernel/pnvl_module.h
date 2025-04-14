@@ -22,7 +22,7 @@
 struct pnvl_op {
 	struct list_head list;
 	wait_queue_head_t waitq;
-	int nwaiting;
+	volatile int nwaiting;
 	int flag; // for the wait queue
 	pnvl_handle_t id;
 	unsigned int command; // PNVL_IOCTL_SEND or PNVL_IOCTL_RECV (for now)
