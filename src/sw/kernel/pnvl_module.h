@@ -19,8 +19,6 @@
 #define PNVL_MODE_PASSIVE 0
 #define PNVL_MODE_OFF -1
 
-typedef unsigned long pnvl_handle_t;
-
 struct pnvl_op {
 	struct list_head list;
 	wait_queue_head_t waitq;

@@ -32,16 +32,22 @@ int main(int argc, char *argv[])
 	int sz_n, sz_t, sz_m, g_len, g_ofs, fd, rv;
 	TYPE *pt_A, *pt_B, *pt_C;
 	size_t sz_A, sz_B, sz_C;
+	pnvl_handle_t id;
 
 	_pnvl_open_devs();
 	fd = _pnvl_devs->fds[0];
 
 	rv = _pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
-	if (rv < 0)
+	if (rv < 0) {
 		perror("_pnvl_recv_args");
-	rv = _pnvl_wait(fd);
-	if (rv < 0)
+		exit(1);
+	}
+
+	id = rv;
+	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(args)");
+		exit(1);
+	}
 
 	sz_A = sz_n * sz_t * sizeof(TYPE);
 	sz_B = sz_t * sz_m * sizeof(TYPE);
@@ -51,25 +57,41 @@ int main(int argc, char *argv[])
 	pt_C = malloc(sz_C);
 
 	rv = _pnvl_recv(fd, pt_A, sz_A);
-	if (rv < 0)
+	if (rv < 0) {
 		perror("_pnvl_recv(A)");
-	rv = _pnvl_wait(fd);
-	if (rv < 0)
+		exit(1);
+	}
+#if WAIT_ALL_OPS
+	id = rv;
+	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(A)");
+		exit(1);
+	}
+#endif
 
 	rv = _pnvl_recv(fd, pt_B, sz_B);
-	if (rv < 0)
+	if (rv < 0) {
 		perror("_pnvl_recv(B)");
-	rv = _pnvl_wait(fd);
-	if (rv < 0)
+		exit(1);
+	}
+#if WAIT_ALL_OPS
+	id = rv;
+	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(B)");
+		exit(1);
+	}
+#endif
 
 	rv = _pnvl_recv(fd, pt_C, sz_C);
-	if (rv < 0)
+	if (rv < 0) {
 		perror("_pnvl_recv(C)");
-	rv = _pnvl_wait(fd);
-	if (rv < 0)
+		exit(1);
+	}
+	id = rv;
+	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(C)");
+		exit(1);
+	}
 
 	TYPE (* __restrict__ A)[sz_t] = (TYPE (*)[sz_t])pt_A;
 	TYPE (* __restrict__ B)[sz_m] = (TYPE (*)[sz_m])pt_B;
@@ -88,11 +110,15 @@ int main(int argc, char *argv[])
 	/* FUNCTION END ---------------------------------------- */
 
 	rv = _pnvl_send(fd, pt_C, sz_C);
-	if (rv < 0)
+	if (rv < 0) {
 		perror("_pnvl_send(C)");
-	rv = _pnvl_wait(fd);
-	if (rv < 0)
+		exit(1);
+	}
+	id = rv;
+	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(C)");
+		exit(1);
+	}
 
 	_pnvl_close_devs();
 	free(pt_A);

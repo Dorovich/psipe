@@ -4,7 +4,6 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <dirent.h>
-#include "sw/module/pnvl_ioctl.h"
 #include "pnvl_wrappers.h"
 
 extern struct _pnvl_devices *_pnvl_devs;
@@ -95,9 +94,9 @@ int _pnvl_recv(int fd, void *addr, size_t len)
 	return ioctl(fd, PNVL_IOCTL_RECV, &data);
 }
 
-int _pnvl_wait(int fd)
+int _pnvl_wait(int fd, pnvl_handle_t id)
 {
-	return ioctl(fd, PNVL_IOCTL_WAIT);
+	return ioctl(fd, PNVL_IOCTL_WAIT, id);
 }
 
 int _pnvl_send_args(int fd, int sz_n, int sz_t, int sz_m, int len, int ofs)
