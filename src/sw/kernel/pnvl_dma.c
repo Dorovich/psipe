@@ -23,7 +23,7 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 	if (npages <= 0 || npages > PNVL_HW_BAR0_DMA_HANDLES_CNT)
 		return -EMSGSIZE;
 
-	dma->pages = kcalloc(npages, sizeof(struct page *), GFP_KERNEL);
+	dma->pages = kmalloc_array(npages, sizeof(struct page *), GFP_KERNEL);
 	if (!dma->pages)
 		return -ENOMEM;
 
@@ -37,16 +37,15 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 		goto unpin_pages;
 	}
 
-	// TODO: maybe specify DMA segment size for scatterlist?
-	rv = sg_alloc_table_from_pages(dma->sgt, dma->pages, npages, ofs,
-			dma->len, GFP_KERNEL);
+	rv = sg_alloc_table_from_pages_segment(&dma->sgt, dma->pages, npages,
+			ofs, dma->len, PAGE_SIZE, GFP_KERNEL);
 	if (rv < 0)
 		goto free_table;
 
 	return 0;
 
 free_table:
-	sg_free_table(dma->sgt);
+	sg_free_table(&dma->sgt);
 unpin_pages:
 	unpin_user_pages(dma->pages, pinned);
 free_pages:
@@ -58,15 +57,25 @@ int pnvl_dma_map_pages(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 
-	dma->nmapped = dma_map_sg(&pnvl_dev->pdev->dev, dma->sgt->sgl,
-			dma->sgt->nents, dma->direction);
+	dma->nmapped = dma_map_sg(&pnvl_dev->pdev->dev, dma->sgt.sgl,
+			dma->sgt.nents, dma->direction);
 
-	printk(KERN_INFO "dma_map_sg: created %lu mappings\n", dma->nmapped);
+	//printk(KERN_INFO "dma_map_sg: using %lu mappings\n", dma->nmapped);
 
 	return (int)dma->nmapped;
 }
 
-void pnvl_dma_write_config(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_write_setup(struct pnvl_dev *pnvl_dev, int mode,
+		enum dma_data_direction dir)
+{
+	void __iomem *mmio = pnvl_dev->bar.mmio;
+	struct pnvl_dma *dma = &pnvl_dev->dma;
+	dma->mode = mode;
+	dma->direction = dir;
+	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
+}
+
+void pnvl_dma_write_maps(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 	void __iomem *mmio = pnvl_dev->bar.mmio;
@@ -76,10 +85,9 @@ void pnvl_dma_write_config(struct pnvl_dev *pnvl_dev)
 	int i;
 
 	iowrite32((u32)dma->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
-	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
 	iowrite32((u32)dma->nmapped, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 
-	for_each_sg(dma->sgt->sgl, sg, dma->nmapped, i) {
+	for_each_sg(dma->sgt.sgl, sg, dma->nmapped, i) {
 		handle = sg_dma_address(sg);
 		iowrite32((u32)handle, mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
 		ofs += sizeof(u32);
@@ -96,7 +104,7 @@ void pnvl_dma_unmap_pages(struct pnvl_dev *pnvl_dev)
 {
 	struct pnvl_dma *dma = &pnvl_dev->dma;
 
-	dma_unmap_sg(&pnvl_dev->pdev->dev, dma->sgt->sgl, dma->sgt->nents,
+	dma_unmap_sg(&pnvl_dev->pdev->dev, dma->sgt.sgl, dma->sgt.nents,
 			dma->direction);
 }
 

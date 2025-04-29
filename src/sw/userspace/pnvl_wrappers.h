@@ -1,6 +1,6 @@
 #include "sw/module/pnvl_ioctl.h"
 
-#define WAIT_ALL_OPS 0
+#define WAIT_ALL_OPS 1
 
 // d = dev num, n = total elems, t = total devs
 #define PART_FOR_DEV(d, n, t) ((n / t) + (d < (n % t)))

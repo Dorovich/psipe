@@ -20,7 +20,7 @@ while getopts "Ddsp:n:mM" opt; do
 		D) # DEBUG QEMU
 			debug_qemu="-s"
 			;;
-		d) # DEBUG THE DEVICE
+		d) # DEBUG THE DEVICE (W.I.P.)
 			debug_dev=on
 			;;
 		s) # ACT AS SERVER

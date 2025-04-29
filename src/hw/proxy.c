@@ -111,12 +111,10 @@ static int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
 		pnvl_proxy_issue_req(dev, PNVL_REQ_RLN);
 		send(con, &dev->dma.config.len_avail,
 				sizeof(dev->dma.config.len_avail), 0);
-		printf("PROXY: SEND LEN (%lu)\n", dev->dma.config.len_avail);
 		break;
 	case PNVL_REQ_RLN:
 		recv(con, &dev->dma.config.len_avail,
 				sizeof(dev->dma.config.len_avail), 0);
-		printf("PROXY: RECV LEN (%lu)\n", dev->dma.config.len_avail);
 		break;
 	case PNVL_REQ_ACK:
 		break;

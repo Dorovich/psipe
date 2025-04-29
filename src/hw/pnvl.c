@@ -112,7 +112,7 @@ static void pnvl_transfer_pages(PNVLDevice *dev)
 {
 	int ret, len;
 
-	printf("BEGIN pnvl_transfer_pages\n");
+	printf("(TX) beginning - %lu\n", dev->dma.config.len);
 	if (pnvl_dma_begin_run(dev) < 0)
 		return;
 
@@ -123,14 +123,14 @@ static void pnvl_transfer_pages(PNVLDevice *dev)
 	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
 
 	pnvl_dma_end_run(dev);
-	printf("DONE pnvl_transfer_pages (ret=%d)\n", ret);
+	printf("(TX) finished - %d\n", ret);
 }
 
 static void pnvl_receive_pages(PNVLDevice *dev)
 {
 	int ret, len;
 
-	printf("BEGIN pnvl_receive_pages\n");
+	printf("(RX) beginning - %lu\n", dev->dma.config.len);
 	if (pnvl_dma_begin_run(dev) < 0)
 		return;
 
@@ -141,7 +141,7 @@ static void pnvl_receive_pages(PNVLDevice *dev)
 	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
 
 	pnvl_dma_end_run(dev);
-	printf("DONE pnvl_receive_pages (ret=%d)\n", ret);
+	printf("(RX) finished - %d\n", ret);
 }
 
 /* ============================================================================
@@ -151,6 +151,7 @@ static void pnvl_receive_pages(PNVLDevice *dev)
 
 void pnvl_execute(PNVLDevice *dev)
 {
+	printf(">>>>>>>>>> START RUN\n");
 	switch(dev->dma.mode) {
 	case DMA_MODE_ACTIVE:
 		pnvl_transfer_pages(dev);
@@ -162,5 +163,6 @@ void pnvl_execute(PNVLDevice *dev)
 	default:
 		return;
 	}
+	printf("<<<<<<<<<< END RUN\n");
 	pnvl_irq_raise(dev, PNVL_HW_IRQ_WORK_ENDED_VECTOR);
 }

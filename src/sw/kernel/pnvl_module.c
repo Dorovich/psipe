@@ -57,10 +57,11 @@ static void pnvl_set_size_avail(struct pnvl_dev *pnvl_dev)
 	iowrite32(len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 }
 
-static long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev)
+long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev)
 {
 	int rv;
 
+	pnvl_dma_write_setup(pnvl_dev, PNVL_MODE_ACTIVE, DMA_TO_DEVICE);
 	if (!pnvl_check_size_avail(pnvl_dev))
 		return -EMSGSIZE;
 
@@ -74,16 +75,17 @@ static long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev)
 		return rv;
 	}
 
-	pnvl_dma_write_config(pnvl_dev);
+	pnvl_dma_write_maps(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 
 	return 0;
 }
 
-static long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
+long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
 {
 	int rv;
 
+	pnvl_dma_write_setup(pnvl_dev, PNVL_MODE_PASSIVE, DMA_FROM_DEVICE);
 	pnvl_set_size_avail(pnvl_dev);
 
 	rv = pnvl_dma_pin_pages(pnvl_dev);
@@ -96,21 +98,10 @@ static long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
 		return rv;
 	}
 
-	pnvl_dma_write_config(pnvl_dev);
+	pnvl_dma_write_maps(pnvl_dev);
 	pnvl_dma_doorbell_ring(pnvl_dev);
 
 	return 0;
-}
-
-long pnvl_ioctl_run(struct pnvl_dev *pnvl_dev, unsigned int cmd)
-{
-	switch(cmd) {
-	case PNVL_IOCTL_SEND:
-		return pnvl_ioctl_send(pnvl_dev);
-	case PNVL_IOCTL_RECV:
-		return pnvl_ioctl_recv(pnvl_dev);
-	}
-	return -ENOTTY;
 }
 
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
@@ -118,43 +109,34 @@ static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 	struct pnvl_dev *pnvl_dev = fp->private_data;
 	struct pnvl_ops *ops = &pnvl_dev->ops;
 	struct pnvl_op *op;
+	bool noempty = !!pnvl_op_first(ops); /* first != NULL */
 	pnvl_handle_t id;
-	bool empty = !pnvl_op_first(ops);
-	int rv = -ENOTTY;
+	long rv = -ENOTTY;
 
 	switch(cmd) {
 	case PNVL_IOCTL_SEND:
-		op = pnvl_op_new(PNVL_IOCTL_SEND, arg);
-		id = pnvl_op_add(ops, op);
-		rv = (int)id;
-		if (rv < 0 || !empty)
-			goto out;
-		rv = pnvl_op_setup(pnvl_dev, op);
-		if (rv < 0)
-			goto out;
-		return pnvl_ioctl_send(pnvl_dev);
 	case PNVL_IOCTL_RECV:
-		op = pnvl_op_new(PNVL_IOCTL_SEND, arg);
-		id = pnvl_op_add(ops, op);
-		rv = (int)id;
-		if (rv < 0 || !empty)
+		op = pnvl_op_new(cmd, arg);
+		rv = id = pnvl_op_add(ops, op);
+		if (rv < 0 || noempty)
 			goto out;
-		rv = pnvl_op_setup(pnvl_dev, op);
-		if (rv < 0)
-			goto out;
-		return pnvl_ioctl_recv(pnvl_dev);
+		pnvl_dev->dma.addr = op->data.addr;
+		pnvl_dev->dma.len = op->data.len;
+		rv = op->ioctl_fn(pnvl_dev);
+		rv = rv < 0 ? rv : id;
+		break;
 	case PNVL_IOCTL_WAIT:
-		rv = empty ? -EINVAL : 0;
+		id = (pnvl_handle_t)arg;
+		rv = id < ops->next_id ? 0 : -EINVAL;
 		if (rv < 0)
 			goto out;
-		id = (pnvl_handle_t)arg;
 		op = pnvl_op_get(ops, id);
 		pnvl_op_wait(op);
 		break;
 	}
 
 out:
-	return rv < 0 ? rv : id;
+	return rv;
 }
 
 static const struct file_operations pnvl_fops = {
@@ -189,7 +171,7 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	}
 	pci_set_drvdata(pdev, pnvl_dev);
 
-	mutex_init(&pnvl_dev->ops.lock);
+	spin_lock_init(&pnvl_dev->ops.lock);
 	INIT_LIST_HEAD(&pnvl_dev->ops.queue);
 	pnvl_dev->ops.next_id = 0;
 
@@ -349,7 +331,9 @@ static void pnvl_remove(struct pci_dev *pdev)
 	pci_release_selected_regions(pdev, pci_select_bars(pdev,
 				IORESOURCE_MEM));
 	pci_disable_device(pdev);
+
 	kfree(pnvl_dev);
+
 	dev_info(&pdev->dev, "pnvl remove - success\n");
 }
 

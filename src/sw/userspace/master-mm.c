@@ -39,7 +39,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 	t0 = now();
 
 	{ /* PNVL PART START =================================== */
-		int rv, fd, num = _pnvl_num_devs();
+		int fd, num = _pnvl_num_devs();
 		int part, sz_part, tot_C = sz_n * sz_m, ofs = 0;
 		pnvl_handle_t id;
 
@@ -49,55 +49,65 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			sz_part = part * sizeof(TYPE);
 			printf("dev=%d part=%d sz_part=%d\n", i, part, sz_part);
 
-			rv = _pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
-			if (rv < 0) {
+			id = _pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
+			if (id < 0) {
 				perror("_pnvl_send_args");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			id = rv;
 			if (_pnvl_wait(fd, id) < 0) {
 				perror("_pnvl_wait(args)");
 				exit(1);
 			}
 #endif
 
-			rv = _pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
-			if (rv < 0) {
+			id = _pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
+			if (id < 0) {
 				perror("_pnvl_send(A)");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			id = rv;
 			if (_pnvl_wait(fd, id) < 0) {
 				perror("_pnvl_wait(A)");
 				exit(1);
 			}
 #endif
 
-			rv = _pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
-			if (rv < 0) {
+			id = _pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
+			if (id < 0) {
 				perror("_pnvl_send(B)");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			id = rv;
 			if (_pnvl_wait(fd, id) < 0) {
 				perror("_pnvl_wait(B)");
 				exit(1);
 			}
 #endif
 
-			rv = _pnvl_send(fd, &C[ofs], sz_part);
-			if (rv < 0) {
+			id = _pnvl_send(fd, &C[ofs], sz_part);
+			if (id < 0) {
 				perror("_pnvl_send(C)");
 				exit(1);
 			}
-			id = rv;
+#if WAIT_ALL_OPS
 			if (_pnvl_wait(fd, id) < 0) {
 				perror("_pnvl_wait(C)");
 				exit(1);
 			}
+#endif
+
+			id = _pnvl_recv(fd, &C[ofs], sz_part);
+			if (id < 0) {
+				perror("_pnvl_recv(C)");
+				exit(1);
+			}
+			if (_pnvl_wait(fd, id) < 0) {
+				perror("_pnvl_wait(C)");
+				exit(1);
+			}
+
+			printf("matmul - part %d/%d ready\n", i+1, num);
 
 			ofs += part;
 		}

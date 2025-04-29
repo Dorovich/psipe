@@ -8,97 +8,107 @@
 
 struct pnvl_op *pnvl_op_new(unsigned int cmd, unsigned long uarg)
 {
+	int rv;
+
 	struct pnvl_op *op = kmalloc(sizeof(*op), GFP_KERNEL);
 	if (!op)
 		goto out;
 
+	switch(cmd) {
+	case PNVL_IOCTL_SEND:
+		rv = copy_from_user(&op->data, (void *)uarg, sizeof(op->data));
+		if (rv < 0)
+			goto clean;
+		op->ioctl_fn = pnvl_ioctl_send;
+		break;
+	case PNVL_IOCTL_RECV:
+		rv = copy_from_user(&op->data, (void *)uarg, sizeof(op->data));
+		if (rv < 0)
+			goto clean;
+		op->ioctl_fn = pnvl_ioctl_recv;
+		break;
+	default:
+		goto clean;
+	}
+
 	init_waitqueue_head(&op->waitq);
+	spin_lock_init(&op->lock);
 	op->nwaiting = 0;
 	op->flag = 0;
-	op->command = cmd;
-	op->uarg = uarg;
 
 out:
 	return op;
+
+clean:
+	kfree(op);
+	return NULL;
 }
 
 pnvl_handle_t pnvl_op_add(struct pnvl_ops *ops, struct pnvl_op *op)
 {
+	unsigned long flags;
+
 	if (!op)
 		return -EINVAL;
 
-	mutex_lock(&ops->lock);
+	spin_lock_irqsave(&ops->lock, flags);
 	list_add_tail(&op->list, &ops->queue);
-	mutex_unlock(&ops->lock);
+	spin_unlock_irqrestore(&ops->lock, flags);
 
 	op->id = ops->next_id++;
+
+	//printk(KERN_INFO "operation added to queue (id=%lu)\n", op->id);
 
 	return op->id;
 }
 
 struct pnvl_op *pnvl_op_first(struct pnvl_ops *ops)
 {
+	unsigned long flags;
 	struct pnvl_op *op = NULL;
 
-	mutex_lock(&ops->lock);
+	spin_lock_irqsave(&ops->lock, flags);
 	if (!list_empty(&ops->queue))
 		op = list_first_entry(&ops->queue, struct pnvl_op, list);
-	mutex_unlock(&ops->lock);
+	spin_unlock_irqrestore(&ops->lock, flags);
 
 	return op;
 }
 
 static void pnvl_op_step(struct pnvl_ops *ops, struct pnvl_op *op)
 {
-	mutex_lock(&ops->lock);
+	unsigned long flags;
+
+	spin_lock_irqsave(&ops->lock, flags);
 	list_del(&op->list);	
-	mutex_unlock(&ops->lock);
+	spin_unlock_irqrestore(&ops->lock, flags);
 
 	op->flag = 1;
 	wake_up_all(&op->waitq);
 
+	spin_lock_irqsave(&op->lock, flags);
 	if (!op->nwaiting)
 		kfree(op);
+	spin_unlock_irqrestore(&op->lock, flags);
 }
 
 void pnvl_op_wait(struct pnvl_op *op)
 {
-	if (!op || op->flag)
+	unsigned long flags;
+
+	if (!op || op->flag) /* op not found or has finished */
 		return;
 
+	spin_lock_irqsave(&op->lock, flags);
 	op->nwaiting++;
+	spin_unlock_irqrestore(&op->lock, flags);
+
 	wait_event(op->waitq, op->flag == 1);
+
+	spin_lock_irqsave(&op->lock, flags);
 	if (!(--op->nwaiting))
 		kfree(op);
-}
-
-int pnvl_op_setup(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
-{
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-	struct pnvl_data data;
-
-	switch(op->command) {
-	case PNVL_IOCTL_SEND:
-		if (copy_from_user(&data, (void *)op->uarg, sizeof(data)) > 0)
-			return -EFAULT;
-		dma->mode = PNVL_MODE_ACTIVE;
-		dma->direction = DMA_TO_DEVICE;
-		dma->addr = data.addr;
-		dma->len = data.len;
-		break;
-	case PNVL_IOCTL_RECV:
-		if (copy_from_user(&data, (void *)op->uarg, sizeof(data)) > 0)
-			return -EFAULT;
-		dma->mode = PNVL_MODE_PASSIVE;
-		dma->direction = DMA_FROM_DEVICE;
-		dma->addr = data.addr;
-		dma->len = data.len;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	return 0;
+	spin_unlock_irqrestore(&op->lock, flags);
 }
 
 void pnvl_op_next(struct pnvl_dev *pnvl_dev)
@@ -107,7 +117,7 @@ void pnvl_op_next(struct pnvl_dev *pnvl_dev)
 	struct pnvl_op *op;
 	int rv;
 
-	op = pnvl_op_first(ops); // current running op
+	op = pnvl_op_first(ops); /* current running op */
 	if (!op) {
 		rv = 0;
 		goto out;
@@ -116,31 +126,29 @@ void pnvl_op_next(struct pnvl_dev *pnvl_dev)
 	pnvl_dma_unmap_pages(pnvl_dev);
 	pnvl_dma_unpin_pages(pnvl_dev);
 	pnvl_dev->dma.mode = PNVL_MODE_OFF;
-
 	pnvl_op_step(ops, op);
 
-	op = pnvl_op_first(ops); // next op to run
+	op = pnvl_op_first(ops); /* next op to run */
 	if (!op) {
 		rv = 0;
 		goto out;
 	}
 
-	rv = pnvl_op_setup(pnvl_dev, op);
-	if (rv < 0)
-		goto out;
-
-	rv = pnvl_ioctl_run(pnvl_dev, op->command);
-
+	pnvl_dev->dma.addr = op->data.addr;
+	pnvl_dev->dma.len = op->data.len;
+	rv = op->ioctl_fn(pnvl_dev);
+	/* rv could be useful for debug */
 out:
-	return; /* rv could be useful for debug */
+	return;
 }
 
 struct pnvl_op *pnvl_op_get(struct pnvl_ops *ops, pnvl_handle_t id)
 {
+	unsigned long flags;
 	struct list_head *entry;
 	struct pnvl_op *cur_op, *op = NULL;
 
-	mutex_lock(&ops->lock);
+	spin_lock_irqsave(&ops->lock, flags);
 	list_for_each(entry, &ops->queue) {
 		cur_op = list_entry(entry, struct pnvl_op, list);
 		if (cur_op->id == id) {
@@ -148,7 +156,7 @@ struct pnvl_op *pnvl_op_get(struct pnvl_ops *ops, pnvl_handle_t id)
 			break;
 		}
 	}
-	mutex_unlock(&ops->lock);
+	spin_unlock_irqrestore(&ops->lock, flags);
 
 	return op;
 }

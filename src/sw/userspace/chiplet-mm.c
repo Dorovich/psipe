@@ -29,7 +29,7 @@ void matmul_func(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
 
 int main(int argc, char *argv[])
 {
-	int sz_n, sz_t, sz_m, g_len, g_ofs, fd, rv;
+	int sz_n, sz_t, sz_m, g_len, g_ofs, fd;
 	TYPE *pt_A, *pt_B, *pt_C;
 	size_t sz_A, sz_B, sz_C;
 	pnvl_handle_t id;
@@ -37,13 +37,12 @@ int main(int argc, char *argv[])
 	_pnvl_open_devs();
 	fd = _pnvl_devs->fds[0];
 
-	rv = _pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
-	if (rv < 0) {
+	id = _pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
+	if (id < 0) {
 		perror("_pnvl_recv_args");
 		exit(1);
 	}
 
-	id = rv;
 	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(args)");
 		exit(1);
@@ -56,38 +55,35 @@ int main(int argc, char *argv[])
 	pt_B = malloc(sz_B);
 	pt_C = malloc(sz_C);
 
-	rv = _pnvl_recv(fd, pt_A, sz_A);
-	if (rv < 0) {
+	id = _pnvl_recv(fd, pt_A, sz_A);
+	if (id < 0) {
 		perror("_pnvl_recv(A)");
 		exit(1);
 	}
 #if WAIT_ALL_OPS
-	id = rv;
 	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(A)");
 		exit(1);
 	}
 #endif
 
-	rv = _pnvl_recv(fd, pt_B, sz_B);
-	if (rv < 0) {
+	id = _pnvl_recv(fd, pt_B, sz_B);
+	if (id < 0) {
 		perror("_pnvl_recv(B)");
 		exit(1);
 	}
 #if WAIT_ALL_OPS
-	id = rv;
 	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(B)");
 		exit(1);
 	}
 #endif
 
-	rv = _pnvl_recv(fd, pt_C, sz_C);
-	if (rv < 0) {
+	id = _pnvl_recv(fd, pt_C, sz_C);
+	if (id < 0) {
 		perror("_pnvl_recv(C)");
 		exit(1);
 	}
-	id = rv;
 	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(C)");
 		exit(1);
@@ -109,12 +105,11 @@ int main(int argc, char *argv[])
 	}
 	/* FUNCTION END ---------------------------------------- */
 
-	rv = _pnvl_send(fd, pt_C, sz_C);
-	if (rv < 0) {
+	id = _pnvl_send(fd, pt_C, sz_C);
+	if (id < 0) {
 		perror("_pnvl_send(C)");
 		exit(1);
 	}
-	id = rv;
 	if (_pnvl_wait(fd, id) < 0) {
 		perror("_pnvl_wait(C)");
 		exit(1);
