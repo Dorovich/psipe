@@ -8,10 +8,16 @@
 #include <math.h>
 #include <errno.h>
 #include "pnvl_wrappers.h"
+#include <signal.h>
+
+static void sighup_handler(int signo)
+{
+	return;
+}
 
 #define TYPE double
 
-struct _pnvl_devices *_pnvl_devs;
+struct pnvl_devices *pnvl_devs;
 
 #define TRUNCATE 1
 #define APPEND 2
@@ -25,6 +31,18 @@ void *matrix_allocate(char *name, int rows, int cols);
 void save_matrix_on_file(char *msg, int rows, int cols, TYPE (*C)[cols], int fop);
 void save_matrix_info(int sz_n, int sz_t, int sz_m);
 
+void matmul_golden(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
+		TYPE (* __restrict__ A)[sz_t], TYPE (* __restrict__ B)[sz_m])
+{
+	for (int j=0; j < sz_m; j++) {
+		for (int i=0; i < sz_n; i++) {
+			for (int k=0; k < sz_t; k++) {
+				C[i][j] += A[i][k] * B[k][j];
+			}
+		}
+	}
+}
+
 void matmul(char *msg, int sz_n, int sz_t, int sz_m, 
 		TYPE (* __restrict__ C)[sz_m], TYPE (* __restrict__ A)[sz_t],
 		TYPE (* __restrict__ B)[sz_m])
@@ -32,82 +50,84 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 	double t0, t1;
 
 	{ /* PNVL PART START =================================== */
-		_pnvl_open_devs();
+		pnvl_open_devs();
 	} /* PNVL PART END ===================================== */
 
-	printf ("num_devs %d\n", _pnvl_num_devs());
+	printf ("num_devs %d\n", pnvl_num_devs());
 	t0 = now();
 
 	{ /* PNVL PART START =================================== */
-		int fd, num = _pnvl_num_devs();
-		int part, sz_part, tot_C = sz_n * sz_m, ofs = 0;
+		int fd, num = pnvl_num_devs();
+		int part, sz_part, ofs = 0;
 		pnvl_handle_t id;
 
 		for (int i = 0; i < num; ++i) {
-			fd = _pnvl_fd(i);
-			part = PART_FOR_DEV(i, tot_C, num);
-			sz_part = part * sizeof(TYPE);
+			fd = pnvl_fd(i);
+			part = PART_FOR_DEV(i, sz_n, num);
+			sz_part = part * sz_m * sizeof(TYPE);
 			printf("dev=%d part=%d sz_part=%d\n", i, part, sz_part);
 
-			id = _pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
+			id = pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
 			if (id < 0) {
-				perror("_pnvl_send_args");
+				perror("pnvl_send_args");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			if (_pnvl_wait(fd, id) < 0) {
-				perror("_pnvl_wait(args)");
+			if (pnvl_wait(fd, id) < 0) {
+				perror("pnvl_wait(args)");
 				exit(1);
 			}
 #endif
 
-			id = _pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
+			id = pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
 			if (id < 0) {
-				perror("_pnvl_send(A)");
+				perror("pnvl_send(A)");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			if (_pnvl_wait(fd, id) < 0) {
-				perror("_pnvl_wait(A)");
+			if (pnvl_wait(fd, id) < 0) {
+				perror("pnvl_wait(A)");
 				exit(1);
 			}
 #endif
 
-			id = _pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
+			id = pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
 			if (id < 0) {
-				perror("_pnvl_send(B)");
+				perror("pnvl_send(B)");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			if (_pnvl_wait(fd, id) < 0) {
-				perror("_pnvl_wait(B)");
+			if (pnvl_wait(fd, id) < 0) {
+				perror("pnvl_wait(B)");
 				exit(1);
 			}
 #endif
 
-			id = _pnvl_send(fd, &C[ofs], sz_part);
+			id = pnvl_send(fd, &C[ofs * sz_m], sz_part);
 			if (id < 0) {
-				perror("_pnvl_send(C)");
+				perror("pnvl_send(C)");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			if (_pnvl_wait(fd, id) < 0) {
-				perror("_pnvl_wait(C)");
+			if (pnvl_wait(fd, id) < 0) {
+				perror("pnvl_wait(C)");
 				exit(1);
 			}
 #endif
 
-			id = _pnvl_recv(fd, &C[ofs], sz_part);
+			id = pnvl_recv(fd, &C[ofs * sz_m], sz_part);
 			if (id < 0) {
-				perror("_pnvl_recv(C)");
+				perror("pnvl_recv(C)");
 				exit(1);
 			}
-			if (_pnvl_wait(fd, id) < 0) {
-				perror("_pnvl_wait(C)");
+			if (pnvl_wait(fd, id) < 0) {
+				perror("pnvl_wait(C)");
 				exit(1);
 			}
+			pnvl_clean(fd);
 
 			printf("matmul - part %d/%d ready\n", i+1, num);
+			fflush(NULL);
 
 			ofs += part;
 		}
@@ -116,7 +136,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 	t1 = now();
 
 	{ /* PNVL PART START =================================== */
-		_pnvl_close_devs();
+		pnvl_close_devs();
 	} /* PNVL PART END ===================================== */
 
 	show_time(msg, t0, t1);
@@ -158,10 +178,19 @@ void matrix_init(char * msg, int rows, int cols, TYPE (* mat)[cols],
 
 TYPE A[SIZE_N][SIZE_T];
 TYPE B[SIZE_T][SIZE_M];
-TYPE *C; 
+TYPE *C, *C_golden; 
 
 int main(int argc, char *argv[])
 {
+	struct sigaction sa;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = sighup_handler;
+	if (sigaction(SIGHUP, &sa, NULL) < 0) {
+		perror("sigaction(sighup)");
+		exit(EXIT_FAILURE);
+	}
+
 	int sz_n = SIZE_N, sz_t = SIZE_T, sz_m = SIZE_M;
 	int save_matrices = 0;
 	int i;
@@ -201,14 +230,28 @@ int main(int argc, char *argv[])
 	printf("Matrix sizes %d %d %d\n", sz_n, sz_t, sz_m);
 
 	C = matrix_allocate("C", sz_n, sz_m);
+	C_golden = matrix_allocate("C", sz_n, sz_m);
 
 	matrix_init("init(A)", sz_n, sz_t, A, 0.04);
 	matrix_init("init(B)", sz_t, sz_m, B, 0.07);
-	matrix_init("init(C)", sz_n, sz_m, (TYPE (*)[sz_m]) C, 0.0);
+	matrix_init("init(C)", sz_n, sz_m, (TYPE (*)[sz_m])C, 0.0);
+
+	memcpy(C_golden, C, sz_n * sz_m * sizeof(TYPE));
 
 	printf("Iniciant matmul, pid = %d\n", getpid());
 
-	matmul("C += AxB", sz_n, sz_t, sz_m, (TYPE (*)[sz_m]) C, A, B);
+	matmul("C += AxB", sz_n, sz_t, sz_m, (TYPE (*)[sz_m])C, A, B);
+
+	matmul_golden(sz_n, sz_t, sz_m, (TYPE (*)[sz_m])C, A, B);
+
+	int errors = 0;
+	for (int i = 0; i < sz_n * sz_m; ++i) {
+		TYPE c = C[i];
+		TYPE g = C_golden[i];
+		if (c != g)
+			++errors;
+	}
+	printf("Multiplication errors: %d\n", errors);
 
 	if (save_matrices) {
 		printf ("Saving matrices... 1 "); fflush(NULL);
@@ -229,7 +272,8 @@ void *matrix_allocate(char *name, int rows, int cols)
 {
 	//TYPE *m = malloc(rows*cols*sizeof(TYPE));
 	TYPE *m = NULL;
-	int err = posix_memalign((void *)&m, getpagesize(), rows*cols*sizeof(TYPE) + getpagesize());
+	int err = posix_memalign((void *)&m, getpagesize(),
+			rows * cols * sizeof(TYPE));
 	//if (m == NULL) {
 	if (err != 0) {
 		//fprintf(stderr, "malloc(%s): %s\n", name, strerror(errno));

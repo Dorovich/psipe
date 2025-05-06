@@ -8,10 +8,16 @@
 #include <math.h>
 #include <errno.h>
 #include "pnvl_wrappers.h"
+#include <signal.h>
+
+static void sighup_handler(int signo)
+{
+	return;
+}
 
 #define TYPE double
 
-struct _pnvl_devices *_pnvl_devs;
+struct pnvl_devices *pnvl_devs;
 
 /* ORIGINAL FUNCTION
 void matmul_func(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
@@ -29,63 +35,68 @@ void matmul_func(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
 
 int main(int argc, char *argv[])
 {
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = sighup_handler;
+	sigaction(SIGHUP, &sa, NULL);
+
 	int sz_n, sz_t, sz_m, g_len, g_ofs, fd;
 	TYPE *pt_A, *pt_B, *pt_C;
 	size_t sz_A, sz_B, sz_C;
 	pnvl_handle_t id;
 
-	_pnvl_open_devs();
-	fd = _pnvl_devs->fds[0];
+	pnvl_open_devs();
+	fd = pnvl_devs->fds[0];
 
-	id = _pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
+	id = pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
 	if (id < 0) {
-		perror("_pnvl_recv_args");
+		perror("pnvl_recv_args");
 		exit(1);
 	}
 
-	if (_pnvl_wait(fd, id) < 0) {
-		perror("_pnvl_wait(args)");
+	if (pnvl_wait(fd, id) < 0) {
+		perror("pnvl_wait(args)");
 		exit(1);
 	}
 
 	sz_A = sz_n * sz_t * sizeof(TYPE);
 	sz_B = sz_t * sz_m * sizeof(TYPE);
-	sz_C = g_len * sizeof(TYPE);
+	sz_C = g_len * sz_m * sizeof(TYPE);
 	pt_A = malloc(sz_A);
 	pt_B = malloc(sz_B);
 	pt_C = malloc(sz_C);
 
-	id = _pnvl_recv(fd, pt_A, sz_A);
+	id = pnvl_recv(fd, pt_A, sz_A);
 	if (id < 0) {
-		perror("_pnvl_recv(A)");
+		perror("pnvl_recv(A)");
 		exit(1);
 	}
 #if WAIT_ALL_OPS
-	if (_pnvl_wait(fd, id) < 0) {
-		perror("_pnvl_wait(A)");
+	if (pnvl_wait(fd, id) < 0) {
+		perror("pnvl_wait(A)");
 		exit(1);
 	}
 #endif
 
-	id = _pnvl_recv(fd, pt_B, sz_B);
+	id = pnvl_recv(fd, pt_B, sz_B);
 	if (id < 0) {
-		perror("_pnvl_recv(B)");
+		perror("pnvl_recv(B)");
 		exit(1);
 	}
 #if WAIT_ALL_OPS
-	if (_pnvl_wait(fd, id) < 0) {
-		perror("_pnvl_wait(B)");
+	if (pnvl_wait(fd, id) < 0) {
+		perror("pnvl_wait(B)");
 		exit(1);
 	}
 #endif
 
-	id = _pnvl_recv(fd, pt_C, sz_C);
+	id = pnvl_recv(fd, pt_C, sz_C);
 	if (id < 0) {
-		perror("_pnvl_recv(C)");
+		perror("pnvl_recv(C)");
 		exit(1);
 	}
-	if (_pnvl_wait(fd, id) < 0) {
-		perror("_pnvl_wait(C)");
+	if (pnvl_wait(fd, id) < 0) {
+		perror("pnvl_wait(C)");
 		exit(1);
 	}
 
@@ -94,6 +105,7 @@ int main(int argc, char *argv[])
 	TYPE (* __restrict__ C)[sz_m] = (TYPE (*)[sz_m])pt_C;
 
 	/* FUNCTION START -------------------------------------- */
+	/*
 	for (int g=0; g < g_len; g++) {
 		int ci = g / sz_m;
 		int cj = g % sz_m;
@@ -103,19 +115,28 @@ int main(int argc, char *argv[])
 			C[ci][cj] += A[i][k] * B[k][j];
 		}
 	}
+	*/
+	for (int j=0; j < sz_m; j++) {
+		for (int i=0; i < g_len; i++) {
+			for (int k=0; k < sz_t; k++) {
+				C[i+g_ofs][j] += A[i][k] * B[k][j];
+			}
+		}
+	}
 	/* FUNCTION END ---------------------------------------- */
 
-	id = _pnvl_send(fd, pt_C, sz_C);
+	id = pnvl_send(fd, pt_C, sz_C);
 	if (id < 0) {
-		perror("_pnvl_send(C)");
+		perror("pnvl_send(C)");
 		exit(1);
 	}
-	if (_pnvl_wait(fd, id) < 0) {
-		perror("_pnvl_wait(C)");
+	if (pnvl_wait(fd, id) < 0) {
+		perror("pnvl_wait(C)");
 		exit(1);
 	}
+	pnvl_clean(fd);
 
-	_pnvl_close_devs();
+	pnvl_close_devs();
 	free(pt_A);
 	free(pt_B);
 	free(pt_C);

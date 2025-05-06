@@ -107,35 +107,28 @@ long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
-	struct pnvl_ops *ops = &pnvl_dev->ops;
 	struct pnvl_op *op;
-	bool noempty = !!pnvl_op_first(ops); /* first != NULL */
 	pnvl_handle_t id;
 	long rv = -ENOTTY;
 
 	switch(cmd) {
 	case PNVL_IOCTL_SEND:
 	case PNVL_IOCTL_RECV:
-		op = pnvl_op_new(cmd, arg);
-		rv = id = pnvl_op_add(ops, op);
-		if (rv < 0 || noempty)
-			goto out;
-		pnvl_dev->dma.addr = op->data.addr;
-		pnvl_dev->dma.len = op->data.len;
-		rv = op->ioctl_fn(pnvl_dev);
-		rv = rv < 0 ? rv : id;
+		op = pnvl_ops_new(cmd, arg);
+		id = pnvl_ops_init(pnvl_dev, op);
+		rv = (long)id;
 		break;
 	case PNVL_IOCTL_WAIT:
 		id = (pnvl_handle_t)arg;
-		rv = id < ops->next_id ? 0 : -EINVAL;
-		if (rv < 0)
-			goto out;
-		op = pnvl_op_get(ops, id);
-		pnvl_op_wait(op);
+		op = pnvl_ops_get(&pnvl_dev->ops, id);
+		rv = pnvl_ops_wait(op);
+		break;
+	case PNVL_IOCTL_CLEAN:
+		pnvl_ops_clean(&pnvl_dev->ops);
+		rv = 0;
 		break;
 	}
 
-out:
 	return rv;
 }
 
@@ -172,7 +165,8 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	pci_set_drvdata(pdev, pnvl_dev);
 
 	spin_lock_init(&pnvl_dev->ops.lock);
-	INIT_LIST_HEAD(&pnvl_dev->ops.queue);
+	INIT_LIST_HEAD(&pnvl_dev->ops.active);
+	INIT_LIST_HEAD(&pnvl_dev->ops.inactive);
 	pnvl_dev->ops.next_id = 0;
 
 	pnvl_dev->dma.mode = PNVL_MODE_OFF;

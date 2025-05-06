@@ -60,7 +60,7 @@ int pnvl_dma_map_pages(struct pnvl_dev *pnvl_dev)
 	dma->nmapped = dma_map_sg(&pnvl_dev->pdev->dev, dma->sgt.sgl,
 			dma->sgt.nents, dma->direction);
 
-	//printk(KERN_INFO "dma_map_sg: using %lu mappings\n", dma->nmapped);
+	//pr_info("dma_map_sg: using %lu mappings\n", dma->nmapped);
 
 	return (int)dma->nmapped;
 }

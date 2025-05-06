@@ -14,6 +14,7 @@
 #include <linux/wait.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/atomic.h>
 
 #define PNVL_MODE_ACTIVE 1
 #define PNVL_MODE_PASSIVE 0
@@ -47,7 +48,8 @@ struct pnvl_dma {
 struct pnvl_ops {
 	pnvl_handle_t next_id; // to identify an op
 	spinlock_t lock; // to lock queue access
-	struct list_head queue;
+	struct list_head active;
+	struct list_head inactive;
 };
 
 struct pnvl_dev {
@@ -63,10 +65,10 @@ struct pnvl_dev {
 struct pnvl_op {
 	struct list_head list;
 	wait_queue_head_t waitq;
-	spinlock_t lock; // to lock nwaiting access
-	volatile int nwaiting;
+	atomic_t nwaiting;
 	int flag; // for the wait queue
 	pnvl_handle_t id;
+	long retval;
 	long (*ioctl_fn)(struct pnvl_dev *);
 	union {
 		struct pnvl_data data;
@@ -84,12 +86,13 @@ void pnvl_dma_write_setup(struct pnvl_dev *pnvl_dev, int mode, enum dma_data_dir
 void pnvl_dma_write_maps(struct pnvl_dev *pnvl_dev);
 void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
 
-struct pnvl_op *pnvl_op_new(unsigned int cmd, unsigned long uarg);
-pnvl_handle_t pnvl_op_add(struct pnvl_ops *ops, struct pnvl_op *op);
-struct pnvl_op *pnvl_op_first(struct pnvl_ops *ops);
-void pnvl_op_wait(struct pnvl_op *op);
-void pnvl_op_next(struct pnvl_dev *pnvl_dev);
-struct pnvl_op *pnvl_op_get(struct pnvl_ops *ops, pnvl_handle_t id);
+struct pnvl_op *pnvl_ops_new(unsigned int cmd, unsigned long uarg);
+pnvl_handle_t pnvl_ops_init(struct pnvl_dev *pnvl_dev, struct pnvl_op *op);
+struct pnvl_op *pnvl_ops_current(struct pnvl_ops *ops);
+long pnvl_ops_wait(struct pnvl_op *op);
+void pnvl_ops_next(struct pnvl_dev *pnvl_dev);
+struct pnvl_op *pnvl_ops_get(struct pnvl_ops *ops, pnvl_handle_t id);
+void pnvl_ops_clean(struct pnvl_ops *ops);
 
 int pnvl_irq_enable(struct pnvl_dev *pnvl_dev);
 
