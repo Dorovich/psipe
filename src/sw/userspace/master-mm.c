@@ -21,9 +21,9 @@ struct pnvl_devices *pnvl_devs;
 
 #define TRUNCATE 1
 #define APPEND 2
-#define SIZE_N 64
-#define SIZE_T 100
-#define SIZE_M 64
+#define SIZE_N 80 //64
+#define SIZE_T 90 //100
+#define SIZE_M 80 //64
 
 double now();
 void show_time(char *msg, double t0, double t1);
@@ -31,8 +31,10 @@ void *matrix_allocate(char *name, int rows, int cols);
 void save_matrix_on_file(char *msg, int rows, int cols, TYPE (*C)[cols], int fop);
 void save_matrix_info(int sz_n, int sz_t, int sz_m);
 
-void matmul_golden(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
-		TYPE (* __restrict__ A)[sz_t], TYPE (* __restrict__ B)[sz_m])
+static void matmul_gold(int sz_n, int sz_t, int sz_m,
+		TYPE (* __restrict__ C)[sz_m],
+		TYPE (* __restrict__ A)[sz_t],
+		TYPE (* __restrict__ B)[sz_m])
 {
 	for (int j=0; j < sz_m; j++) {
 		for (int i=0; i < sz_n; i++) {
@@ -63,8 +65,8 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 
 		for (int i = 0; i < num; ++i) {
 			fd = pnvl_fd(i);
-			part = PART_FOR_DEV(i, sz_n, num);
-			sz_part = part * sz_m * sizeof(TYPE);
+			part = PART_FOR_DEV(i, sz_n * sz_m, num);
+			sz_part = part * sizeof(TYPE);
 			printf("dev=%d part=%d sz_part=%d\n", i, part, sz_part);
 
 			id = pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
@@ -103,7 +105,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			}
 #endif
 
-			id = pnvl_send(fd, &C[ofs * sz_m], sz_part);
+			id = pnvl_send(fd, &C[ofs], sz_part);
 			if (id < 0) {
 				perror("pnvl_send(C)");
 				exit(1);
@@ -115,7 +117,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			}
 #endif
 
-			id = pnvl_recv(fd, &C[ofs * sz_m], sz_part);
+			id = pnvl_recv(fd, &C[ofs], sz_part);
 			if (id < 0) {
 				perror("pnvl_recv(C)");
 				exit(1);
@@ -149,7 +151,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 	printf("MFlops:\t%lf\n", operations/(timetaken*1000000.0));
 }
 
-void matrix_init(char * msg, int rows, int cols, TYPE (* mat)[cols],
+void matrix_init(char* msg, int rows, int cols, TYPE (* mat)[cols],
 		TYPE random)
 {
 	//int loop, i, j;
@@ -176,8 +178,8 @@ void matrix_init(char * msg, int rows, int cols, TYPE (* mat)[cols],
 	//printf("\n");
 }
 
-TYPE A[SIZE_N][SIZE_T];
-TYPE B[SIZE_T][SIZE_M];
+TYPE A[SIZE_N][SIZE_T] __attribute__((aligned(sizeof(TYPE))));
+TYPE B[SIZE_T][SIZE_M] __attribute__((aligned(sizeof(TYPE))));
 TYPE *C, *C_golden; 
 
 int main(int argc, char *argv[])
@@ -227,28 +229,35 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	printf("Matrix sizes %d %d %d\n", sz_n, sz_t, sz_m);
+	//printf("Matrix sizes %d %d %d\n", sz_n, sz_t, sz_m);
 
 	C = matrix_allocate("C", sz_n, sz_m);
-	C_golden = matrix_allocate("C", sz_n, sz_m);
+	C_golden = matrix_allocate("C_golden", sz_n, sz_m);
 
 	matrix_init("init(A)", sz_n, sz_t, A, 0.04);
 	matrix_init("init(B)", sz_t, sz_m, B, 0.07);
 	matrix_init("init(C)", sz_n, sz_m, (TYPE (*)[sz_m])C, 0.0);
-
 	memcpy(C_golden, C, sz_n * sz_m * sizeof(TYPE));
 
-	printf("Iniciant matmul, pid = %d\n", getpid());
+	//printf("Iniciant matmul, pid = %d\n", getpid());
 
 	matmul("C += AxB", sz_n, sz_t, sz_m, (TYPE (*)[sz_m])C, A, B);
+	matmul_gold(sz_n, sz_t, sz_m, (TYPE (*)[sz_m])C_golden, A, B);
 
-	matmul_golden(sz_n, sz_t, sz_m, (TYPE (*)[sz_m])C, A, B);
+	/*
+	for (int i=0; i<sz_n; ++i) {
+		double cnt = 0;
+		for (int j=0; j<sz_m; ++j)
+			cnt += C[i*sz_n+j];
+		printf("[%d] %lf\t", i, cnt);
+		if (i%5 == 4)
+			printf("\n");
+	}
+	*/
 
 	int errors = 0;
 	for (int i = 0; i < sz_n * sz_m; ++i) {
-		TYPE c = C[i];
-		TYPE g = C_golden[i];
-		if (c != g)
+		if (C[i] != C_golden[i])
 			++errors;
 	}
 	printf("Multiplication errors: %d\n", errors);
@@ -272,8 +281,8 @@ void *matrix_allocate(char *name, int rows, int cols)
 {
 	//TYPE *m = malloc(rows*cols*sizeof(TYPE));
 	TYPE *m = NULL;
-	int err = posix_memalign((void *)&m, getpagesize(),
-			rows * cols * sizeof(TYPE));
+	int size = rows * cols * sizeof(TYPE);
+	int err = posix_memalign((void *)&m, sizeof(TYPE), size);
 	//if (m == NULL) {
 	if (err != 0) {
 		//fprintf(stderr, "malloc(%s): %s\n", name, strerror(errno));

@@ -20,8 +20,10 @@ static void sighup_handler(int signo)
 struct pnvl_devices *pnvl_devs;
 
 /* ORIGINAL FUNCTION
-void matmul_func(int sz_n, int sz_t, int sz_m, TYPE (* __restrict__ C)[sz_m],
-		TYPE (* __restrict__ A)[sz_t], TYPE (* __restrict__ B)[sz_m])
+static void matmul_func(int sz_n, int sz_t, int sz_m,
+		TYPE (* __restrict__ C)[sz_m],
+		TYPE (* __restrict__ A)[sz_t],
+		TYPE (* __restrict__ B)[sz_m])
 {
 	for (int j=0; j < sz_m; j++) {
 		for (int i=0; i < sz_n; i++) {
@@ -41,7 +43,7 @@ int main(int argc, char *argv[])
 	sigaction(SIGHUP, &sa, NULL);
 
 	int sz_n, sz_t, sz_m, g_len, g_ofs, fd;
-	TYPE *pt_A, *pt_B, *pt_C;
+	void *pt_A = NULL, *pt_B = NULL, *pt_C = NULL;
 	size_t sz_A, sz_B, sz_C;
 	pnvl_handle_t id;
 
@@ -61,10 +63,20 @@ int main(int argc, char *argv[])
 
 	sz_A = sz_n * sz_t * sizeof(TYPE);
 	sz_B = sz_t * sz_m * sizeof(TYPE);
-	sz_C = g_len * sz_m * sizeof(TYPE);
-	pt_A = malloc(sz_A);
-	pt_B = malloc(sz_B);
-	pt_C = malloc(sz_C);
+	sz_C = g_len * sizeof(TYPE);
+
+	if (posix_memalign((void *)&pt_A, sizeof(TYPE), sz_A) < 0) {
+		perror("posix_memalign(A)");
+		exit(1);
+	}
+	if (posix_memalign((void *)&pt_B, sizeof(TYPE), sz_B) < 0) {
+		perror("posix_memalign(B)");
+		exit(1);
+	}
+	if (posix_memalign((void *)&pt_C, sizeof(TYPE), sz_C) < 0) {
+		perror("posix_memalign(C)");
+		exit(1);
+	}
 
 	id = pnvl_recv(fd, pt_A, sz_A);
 	if (id < 0) {
@@ -100,30 +112,33 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	TYPE (* __restrict__ A)[sz_t] = (TYPE (*)[sz_t])pt_A;
-	TYPE (* __restrict__ B)[sz_m] = (TYPE (*)[sz_m])pt_B;
-	TYPE (* __restrict__ C)[sz_m] = (TYPE (*)[sz_m])pt_C;
-
 	/* FUNCTION START -------------------------------------- */
-	/*
 	for (int g=0; g < g_len; g++) {
 		int ci = g / sz_m;
 		int cj = g % sz_m;
 		int i = (g+g_ofs) / sz_m;
 		int j = (g+g_ofs) % sz_m;
 		for (int k=0; k < sz_t; k++) {
-			C[ci][cj] += A[i][k] * B[k][j];
-		}
-	}
-	*/
-	for (int j=0; j < sz_m; j++) {
-		for (int i=0; i < g_len; i++) {
-			for (int k=0; k < sz_t; k++) {
-				C[i+g_ofs][j] += A[i][k] * B[k][j];
-			}
+			/* Access to C is offset:
+			 * 	C[ci][cj] += A[i][k] * B[k][j];
+			 */
+			((TYPE *)pt_C)[ci*sz_m+cj] +=
+				((TYPE *)pt_A)[i*sz_t+k] *
+				((TYPE *)pt_B)[k*sz_m+j];
 		}
 	}
 	/* FUNCTION END ---------------------------------------- */
+
+	/*
+	for (int i=0; i<sz_n; ++i) {
+		double cnt = 0;
+		for (int j=0; j<sz_m; ++j)
+			cnt += ((TYPE *)pt_C)[i*sz_n+j];
+		printf("[%d] %lf\t", i, cnt);
+		if (i%5 == 4)
+			printf("\n");
+	}
+	*/
 
 	id = pnvl_send(fd, pt_C, sz_C);
 	if (id < 0) {

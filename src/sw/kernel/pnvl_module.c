@@ -124,8 +124,7 @@ static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 		rv = pnvl_ops_wait(op);
 		break;
 	case PNVL_IOCTL_CLEAN:
-		pnvl_ops_clean(&pnvl_dev->ops);
-		rv = 0;
+		rv = pnvl_ops_clean(&pnvl_dev->ops);
 		break;
 	}
 

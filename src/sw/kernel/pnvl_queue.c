@@ -169,15 +169,21 @@ out:
 	return op;
 }
 
-void pnvl_ops_clean(struct pnvl_ops *ops)
+int pnvl_ops_clean(struct pnvl_ops *ops)
 {
 	unsigned long flags;
 	struct list_head *entry, *tmp;
 
 	spin_lock_irqsave(&ops->lock, flags);
+	list_for_each_safe(entry, tmp, &ops->active) {
+		list_del(entry);
+		kfree(list_entry(entry, struct pnvl_op, list));
+	}
 	list_for_each_safe(entry, tmp, &ops->inactive) {
 		list_del(entry);
 		kfree(list_entry(entry, struct pnvl_op, list));
 	}
 	spin_unlock_irqrestore(&ops->lock, flags);
+
+	return 0;
 }
