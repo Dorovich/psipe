@@ -126,12 +126,11 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 				perror("pnvl_wait(C)");
 				exit(1);
 			}
-			pnvl_clean(fd);
 
+			pnvl_flush(fd);
+			ofs += part;
 			printf("matmul - part %d/%d ready\n", i+1, num);
 			fflush(NULL);
-
-			ofs += part;
 		}
 	} /* PNVL PART END ===================================== */
 

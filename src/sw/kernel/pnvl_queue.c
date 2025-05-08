@@ -169,7 +169,7 @@ out:
 	return op;
 }
 
-int pnvl_ops_clean(struct pnvl_ops *ops)
+int pnvl_ops_flush(struct pnvl_ops *ops)
 {
 	unsigned long flags;
 	struct list_head *entry, *tmp;

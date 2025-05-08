@@ -103,9 +103,9 @@ int pnvl_wait(int fd, pnvl_handle_t id)
 	return ioctl(fd, PNVL_IOCTL_WAIT, id);
 }
 
-int pnvl_clean(int fd)
+int pnvl_flush(int fd)
 {
-	return ioctl(fd, PNVL_IOCTL_CLEAN);
+	return ioctl(fd, PNVL_IOCTL_FLUSH);
 }
 
 int pnvl_send_args(int fd, int sz_n, int sz_t, int sz_m, int len, int ofs)

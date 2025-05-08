@@ -92,7 +92,7 @@ struct pnvl_op *pnvl_ops_current(struct pnvl_ops *ops);
 long pnvl_ops_wait(struct pnvl_op *op);
 void pnvl_ops_next(struct pnvl_dev *pnvl_dev);
 struct pnvl_op *pnvl_ops_get(struct pnvl_ops *ops, pnvl_handle_t id);
-int pnvl_ops_clean(struct pnvl_ops *ops);
+int pnvl_ops_flush(struct pnvl_ops *ops);
 
 int pnvl_irq_enable(struct pnvl_dev *pnvl_dev);
 

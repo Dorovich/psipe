@@ -12,6 +12,7 @@
 
 static void sighup_handler(int signo)
 {
+	/* Just in case a SIGHUP is received */
 	return;
 }
 
@@ -112,6 +113,10 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	TYPE *A = (TYPE *)pt_A;
+	TYPE *B = (TYPE *)pt_B;
+	TYPE *C = (TYPE *)pt_C;
+
 	/* FUNCTION START -------------------------------------- */
 	for (int g=0; g < g_len; g++) {
 		int ci = g / sz_m;
@@ -122,9 +127,7 @@ int main(int argc, char *argv[])
 			/* Access to C is offset:
 			 * 	C[ci][cj] += A[i][k] * B[k][j];
 			 */
-			((TYPE *)pt_C)[ci*sz_m+cj] +=
-				((TYPE *)pt_A)[i*sz_t+k] *
-				((TYPE *)pt_B)[k*sz_m+j];
+			C[ci*sz_m+cj] += A[i*sz_t+k] * B[k*sz_m+j];
 		}
 	}
 	/* FUNCTION END ---------------------------------------- */
@@ -149,8 +152,8 @@ int main(int argc, char *argv[])
 		perror("pnvl_wait(C)");
 		exit(1);
 	}
-	pnvl_clean(fd);
 
+	pnvl_flush(fd);
 	pnvl_close_devs();
 	free(pt_A);
 	free(pt_B);
