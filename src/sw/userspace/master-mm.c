@@ -60,17 +60,21 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 
 	{ /* PNVL PART START =================================== */
 		int fd, num = pnvl_num_devs();
-		int part, sz_part, ofs = 0;
+		int part, pi, pj, sz_part, ofs = 0;
 		pnvl_handle_t id;
 
 		for (int i = 0; i < num; ++i) {
 			fd = pnvl_fd(i);
 			part = PART_FOR_DEV(i, sz_n * sz_m, num);
 			sz_part = part * sizeof(TYPE);
-			printf("dev=%d part=%d sz_part=%d\n", i, part, sz_part);
+			pi = ofs / sz_m;
+			pj = ofs % sz_m;
+
+			printf("dev=%d (fd=%d), part=%d (sz_part=%d), ofs=%d\n",
+					i, fd, part, part, ofs);
 
 			id = pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
-			if (id < 0) {
+			if ((long)id < 0) {
 				perror("pnvl_send_args");
 				exit(1);
 			}
@@ -82,7 +86,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 #endif
 
 			id = pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
-			if (id < 0) {
+			if ((long)id < 0) {
 				perror("pnvl_send(A)");
 				exit(1);
 			}
@@ -94,7 +98,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 #endif
 
 			id = pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
-			if (id < 0) {
+			if ((long)id < 0) {
 				perror("pnvl_send(B)");
 				exit(1);
 			}
@@ -105,8 +109,8 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			}
 #endif
 
-			id = pnvl_send(fd, &C[ofs], sz_part);
-			if (id < 0) {
+			id = pnvl_send(fd, &C[pi][pj], sz_part);
+			if ((long)id < 0) {
 				perror("pnvl_send(C)");
 				exit(1);
 			}
@@ -117,8 +121,8 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			}
 #endif
 
-			id = pnvl_recv(fd, &C[ofs], sz_part);
-			if (id < 0) {
+			id = pnvl_recv(fd, &C[pi][pj], sz_part);
+			if ((long)id < 0) {
 				perror("pnvl_recv(C)");
 				exit(1);
 			}

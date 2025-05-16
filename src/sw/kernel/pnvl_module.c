@@ -43,65 +43,63 @@ static int pnvl_open(struct inode *inode, struct file *fp)
 	return 0;
 }
 
-static bool pnvl_check_size_avail(struct pnvl_dev *pnvl_dev)
+static bool pnvl_check_size_avail(struct pnvl_dma *dma, struct pnvl_bar *bar)
 {
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
-	return pnvl_dev->dma.len <= len_avail;
+	return dma->len <= ioread32(bar->mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 }
 
-static void pnvl_set_size_avail(struct pnvl_dev *pnvl_dev)
+static void pnvl_set_size_avail(struct pnvl_dma *dma, struct pnvl_bar *bar)
 {
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	u32 len = (u32)pnvl_dev->dma.len;
-	iowrite32(len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
+	iowrite32((u32)dma->len, bar->mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 }
 
-long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev)
+long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev, struct pnvl_dma *dma)
 {
-	int rv;
+	struct pnvl_bar *bar = &pnvl_dev->bar;
+	int rv = 0;
 
-	pnvl_dma_write_setup(pnvl_dev, PNVL_MODE_ACTIVE, DMA_TO_DEVICE);
-	if (!pnvl_check_size_avail(pnvl_dev))
+	pnvl_dma_write_setup(dma, bar, PNVL_MODE_ACTIVE, DMA_TO_DEVICE);
+	if (!pnvl_check_size_avail(dma, bar))
 		return -EMSGSIZE;
 
-	rv = pnvl_dma_pin_pages(pnvl_dev);
-	if (rv < 0)
-		return rv;
-
-	rv = pnvl_dma_map_pages(pnvl_dev);
+	rv = pnvl_dma_map_pages(dma, pnvl_dev->pdev);
 	if (rv < 0) {
-		pnvl_dma_unpin_pages(pnvl_dev);
+		pnvl_dma_unpin_pages(dma); /* there will be no irq */
 		return rv;
 	}
 
-	pnvl_dma_write_maps(pnvl_dev);
-	pnvl_dma_doorbell_ring(pnvl_dev);
+	//pr_info("pnvl_dma_map_pages - success\n");
 
-	return 0;
+	pnvl_dma_write_maps(dma, bar);
+	pnvl_dma_doorbell_ring(bar);
+
+	//pr_info("pnvl_ioctl_send - success\n");
+
+	return (long)rv;
 }
 
-long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev)
+long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, struct pnvl_dma *dma)
 {
-	int rv;
+	struct pnvl_bar *bar = &pnvl_dev->bar;
+	int rv = 0;
 
-	pnvl_dma_write_setup(pnvl_dev, PNVL_MODE_PASSIVE, DMA_FROM_DEVICE);
-	pnvl_set_size_avail(pnvl_dev);
+	pnvl_dma_write_setup(dma, bar, PNVL_MODE_PASSIVE, DMA_FROM_DEVICE);
+	pnvl_set_size_avail(dma, bar);
 
-	rv = pnvl_dma_pin_pages(pnvl_dev);
-	if (rv < 0)
-		return rv;
-
-	rv = pnvl_dma_map_pages(pnvl_dev);
+	rv = pnvl_dma_map_pages(dma, pnvl_dev->pdev);
 	if (rv < 0) {
-		pnvl_dma_unpin_pages(pnvl_dev);
+		pnvl_dma_unpin_pages(dma); /* there will be no irq */
 		return rv;
 	}
 
-	pnvl_dma_write_maps(pnvl_dev);
-	pnvl_dma_doorbell_ring(pnvl_dev);
+	//pr_info("pnvl_dma_map_pages - success\n");
 
-	return 0;
+	pnvl_dma_write_maps(dma, bar);
+	pnvl_dma_doorbell_ring(bar);
+
+	//pr_info("pnvl_ioctl_recv - success\n");
+
+	return (long)rv;
 }
 
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
@@ -124,7 +122,7 @@ static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 		rv = pnvl_ops_wait(op);
 		break;
 	case PNVL_IOCTL_FLUSH:
-		rv = pnvl_ops_flush(&pnvl_dev->ops);
+		rv = pnvl_ops_flush(pnvl_dev);
 		break;
 	}
 
@@ -167,8 +165,6 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	INIT_LIST_HEAD(&pnvl_dev->ops.active);
 	INIT_LIST_HEAD(&pnvl_dev->ops.inactive);
 	pnvl_dev->ops.next_id = 0;
-
-	pnvl_dev->dma.mode = PNVL_MODE_OFF;
 
 	return 0;
 }

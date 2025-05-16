@@ -56,7 +56,6 @@ struct pnvl_dev {
 	struct pci_dev *pdev;
 	struct pnvl_bar bar;
 	struct pnvl_irq irq;
-	struct pnvl_dma dma;
 	struct pnvl_ops ops;
 	dev_t minor, major;
 	struct cdev cdev;
@@ -69,22 +68,20 @@ struct pnvl_op {
 	int flag; // for the wait queue
 	pnvl_handle_t id;
 	long retval;
-	long (*ioctl_fn)(struct pnvl_dev *);
-	union {
-		struct pnvl_data data;
-	};
+	long (*ioctl_fn)(struct pnvl_dev *, struct pnvl_dma *);
+	struct pnvl_dma dma;
 };
 
-long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev);
-long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev);
+long pnvl_ioctl_send(struct pnvl_dev *pnvl_dev, struct pnvl_dma *dma);
+long pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, struct pnvl_dma *dma);
 
-int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_unpin_pages(struct pnvl_dev *pnvl_dev);
-int pnvl_dma_map_pages(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_unmap_pages(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_write_setup(struct pnvl_dev *pnvl_dev, int mode, enum dma_data_direction dir);
-void pnvl_dma_write_maps(struct pnvl_dev *pnvl_dev);
-void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev);
+int pnvl_dma_pin_pages(struct pnvl_dma *dma);
+void pnvl_dma_unpin_pages(struct pnvl_dma *dma);
+int pnvl_dma_map_pages(struct pnvl_dma *dma, struct pci_dev *pdev);
+void pnvl_dma_unmap_pages(struct pnvl_dma *dma, struct pci_dev *pdev);
+void pnvl_dma_write_setup(struct pnvl_dma *dma, struct pnvl_bar *bar, int mode, enum dma_data_direction dir);
+void pnvl_dma_write_maps(struct pnvl_dma *dma, struct pnvl_bar *bar);
+void pnvl_dma_doorbell_ring(struct pnvl_bar *bar);
 
 struct pnvl_op *pnvl_ops_new(unsigned int cmd, unsigned long uarg);
 pnvl_handle_t pnvl_ops_init(struct pnvl_dev *pnvl_dev, struct pnvl_op *op);
@@ -92,7 +89,7 @@ struct pnvl_op *pnvl_ops_current(struct pnvl_ops *ops);
 long pnvl_ops_wait(struct pnvl_op *op);
 void pnvl_ops_next(struct pnvl_dev *pnvl_dev);
 struct pnvl_op *pnvl_ops_get(struct pnvl_ops *ops, pnvl_handle_t id);
-int pnvl_ops_flush(struct pnvl_ops *ops);
+int pnvl_ops_flush(struct pnvl_dev *pnvl_dev);
 
 int pnvl_irq_enable(struct pnvl_dev *pnvl_dev);
 

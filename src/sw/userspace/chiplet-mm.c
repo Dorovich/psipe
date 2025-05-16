@@ -43,9 +43,9 @@ int main(int argc, char *argv[])
 	sa.sa_handler = sighup_handler;
 	sigaction(SIGHUP, &sa, NULL);
 
-	int sz_n, sz_t, sz_m, g_len, g_ofs, fd;
 	void *pt_A = NULL, *pt_B = NULL, *pt_C = NULL;
 	size_t sz_A, sz_B, sz_C;
+	int sz_n, sz_t, sz_m, g_len, g_ofs, fd;
 	pnvl_handle_t id;
 
 	pnvl_open_devs();
@@ -61,6 +61,9 @@ int main(int argc, char *argv[])
 		perror("pnvl_wait(args)");
 		exit(1);
 	}
+
+	printf("sz_n=%d, sz_t=%d, sz_m=%d, g_len=%d, g_ofs=%d\n",
+			sz_n, sz_t, sz_m, g_len, g_ofs);
 
 	sz_A = sz_n * sz_t * sizeof(TYPE);
 	sz_B = sz_t * sz_m * sizeof(TYPE);
@@ -80,7 +83,7 @@ int main(int argc, char *argv[])
 	}
 
 	id = pnvl_recv(fd, pt_A, sz_A);
-	if (id < 0) {
+	if ((long)id < 0) {
 		perror("pnvl_recv(A)");
 		exit(1);
 	}
@@ -92,7 +95,7 @@ int main(int argc, char *argv[])
 #endif
 
 	id = pnvl_recv(fd, pt_B, sz_B);
-	if (id < 0) {
+	if ((long)id < 0) {
 		perror("pnvl_recv(B)");
 		exit(1);
 	}
@@ -104,7 +107,7 @@ int main(int argc, char *argv[])
 #endif
 
 	id = pnvl_recv(fd, pt_C, sz_C);
-	if (id < 0) {
+	if ((long)id < 0) {
 		perror("pnvl_recv(C)");
 		exit(1);
 	}
@@ -113,38 +116,34 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	TYPE *A = (TYPE *)pt_A;
-	TYPE *B = (TYPE *)pt_B;
-	TYPE *C = (TYPE *)pt_C;
-
 	/* FUNCTION START -------------------------------------- */
-	for (int g=0; g < g_len; g++) {
-		int ci = g / sz_m;
-		int cj = g % sz_m;
-		int i = (g+g_ofs) / sz_m;
-		int j = (g+g_ofs) % sz_m;
+	TYPE *A = (TYPE *)pt_A, *B = (TYPE *)pt_B, *C = (TYPE *)pt_C;
+	for (int g = g_ofs; g < g_ofs+g_len; g++) {
+		int i = g / sz_m;
+		int j = g % sz_m;
 		for (int k=0; k < sz_t; k++) {
-			/* Access to C is offset:
-			 * 	C[ci][cj] += A[i][k] * B[k][j];
-			 */
-			C[ci*sz_m+cj] += A[i*sz_t+k] * B[k*sz_m+j];
+			int a_idx = i*sz_t+k;
+			int b_idx = k*sz_m+j;
+			int c_idx = g-g_ofs;
+
+			if (a_idx < 0 || a_idx >= sz_n * sz_t)
+				printf("incorrect A index for g=%d, i=%d, k=%d\n", g, i, k);
+			else if (b_idx < 0 || b_idx >= sz_t * sz_m)
+				printf("incorrect B index for g=%d, j=%d, k=%d\n", g, j, k);
+			else if (c_idx < 0 || c_idx >= g_len)
+				printf("incorrect C index for g=%d\n", g);
+			else {
+				TYPE a = A[i*sz_t+k];
+				TYPE b = B[k*sz_m+j];
+				C[g-g_ofs] += (TYPE)(a*b);
+				//C[g-g_ofs] += A[i*sz_t+k] * B[k*sz_m+j];
+			}
 		}
 	}
 	/* FUNCTION END ---------------------------------------- */
 
-	/*
-	for (int i=0; i<sz_n; ++i) {
-		double cnt = 0;
-		for (int j=0; j<sz_m; ++j)
-			cnt += ((TYPE *)pt_C)[i*sz_n+j];
-		printf("[%d] %lf\t", i, cnt);
-		if (i%5 == 4)
-			printf("\n");
-	}
-	*/
-
 	id = pnvl_send(fd, pt_C, sz_C);
-	if (id < 0) {
+	if ((long)id < 0) {
 		perror("pnvl_send(C)");
 		exit(1);
 	}

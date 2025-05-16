@@ -9,6 +9,7 @@
 struct pnvl_op *pnvl_ops_new(unsigned int cmd, unsigned long uarg)
 {
 	int rv;
+	struct pnvl_data data;
 
 	struct pnvl_op *op = kmalloc(sizeof(*op), GFP_KERNEL);
 	if (!op)
@@ -16,15 +17,21 @@ struct pnvl_op *pnvl_ops_new(unsigned int cmd, unsigned long uarg)
 
 	switch(cmd) {
 	case PNVL_IOCTL_SEND:
-		rv = copy_from_user(&op->data, (void *)uarg, sizeof(op->data));
+		rv = copy_from_user(&data, (void *)uarg, sizeof(data));
 		if (rv < 0)
 			goto clean;
+		op->dma.addr = data.addr;
+		op->dma.len = data.len;
+		op->dma.mode = PNVL_MODE_OFF;
 		op->ioctl_fn = pnvl_ioctl_send;
 		break;
 	case PNVL_IOCTL_RECV:
-		rv = copy_from_user(&op->data, (void *)uarg, sizeof(op->data));
+		rv = copy_from_user(&data, (void *)uarg, sizeof(data));
 		if (rv < 0)
 			goto clean;
+		op->dma.addr = data.addr;
+		op->dma.len = data.len;
+		op->dma.mode = PNVL_MODE_OFF;
 		op->ioctl_fn = pnvl_ioctl_recv;
 		break;
 	default:
@@ -47,11 +54,17 @@ pnvl_handle_t pnvl_ops_init(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
 {
 	struct pnvl_ops *ops = &pnvl_dev->ops;
 	unsigned long flags;
-	long rv = -EINVAL;
+	long rv = 0;
 	int empty;
 
 	if (!op)
-		goto out;
+		return -EINVAL;
+
+	rv = pnvl_dma_pin_pages(&op->dma);
+	if (rv < 0)
+		return rv;
+
+	//pr_info("pnvl_dma_pin_pages - success\n");
 
 	spin_lock_irqsave(&ops->lock, flags);
 	empty = list_empty(&ops->active); 
@@ -60,16 +73,13 @@ pnvl_handle_t pnvl_ops_init(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
 	spin_unlock_irqrestore(&ops->lock, flags);
 
 	if (empty) {
-		pnvl_dev->dma.addr = op->data.addr;
-		pnvl_dev->dma.len = op->data.len;
-		rv = op->ioctl_fn(pnvl_dev);
-		//pr_info("pnvl_ops_init - set up id %lu\n", op->id);
+		//pr_info("pnvl_ops_init - running op %lu\n", op->id);
+		rv = op->ioctl_fn(pnvl_dev, &op->dma);
+		if (rv < 0)
+			return rv;
 	}
 
-	//pr_info("pnvl_ops_init - id %lu active\n", op->id);
-
-out:
-	return rv < 0 ? rv : op->id;
+	return op->id;
 }
 
 struct pnvl_op *pnvl_ops_current(struct pnvl_ops *ops)
@@ -79,15 +89,16 @@ struct pnvl_op *pnvl_ops_current(struct pnvl_ops *ops)
 		NULL : list_first_entry(&ops->active, struct pnvl_op, list);
 }
 
-static void pnvl_ops_fini(struct pnvl_ops *ops, struct pnvl_op *op)
+static void pnvl_ops_fini(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
 {
+	pnvl_dma_unmap_pages(&op->dma, pnvl_dev->pdev);
+	pnvl_dma_unpin_pages(&op->dma);
+
 	/* ops->lock must be taken */
-	list_move_tail(&op->list, &ops->inactive);
+	list_move_tail(&op->list, &pnvl_dev->ops.inactive);
 
 	op->flag = 1;
 	wake_up_all(&op->waitq);
-
-	//pr_info("pnvl_ops_fini - id %lu inactive\n", op->id);
 }
 
 long pnvl_ops_wait(struct pnvl_op *op)
@@ -117,23 +128,16 @@ void pnvl_ops_next(struct pnvl_dev *pnvl_dev)
 	unsigned long flags;
 
 	spin_lock_irqsave(&ops->lock, flags);
+
 	op = pnvl_ops_current(ops);
 	if (!op)
 		goto unlock;
-
-	pnvl_dma_unmap_pages(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-	pnvl_ops_fini(ops, op);
+	pnvl_ops_fini(pnvl_dev, op);
 	op = pnvl_ops_current(ops);
-	if (!op)
-		goto unlock;
-
-	spin_unlock_irqrestore(&ops->lock, flags);
-	pnvl_dev->dma.addr = op->data.addr;
-	pnvl_dev->dma.len = op->data.len;
-	op->retval = op->ioctl_fn(pnvl_dev);
-
-	//pr_info("pnvl_ops_next - set up id %lu\n", op->id);
+	if (op) {
+		//pr_info("pnvl_ops_next - running op %lu\n", op->id);
+		op->retval = op->ioctl_fn(pnvl_dev, &op->dma);
+	}
 
 unlock:
 	spin_unlock_irqrestore(&ops->lock, flags);
@@ -141,9 +145,9 @@ unlock:
 
 struct pnvl_op *pnvl_ops_get(struct pnvl_ops *ops, pnvl_handle_t id)
 {
-	unsigned long flags;
-	struct list_head *entry;
 	struct pnvl_op *cur_op, *op = NULL;
+	struct list_head *entry;
+	unsigned long flags;
 
 	if (id >= ops->next_id)
 		goto out;
@@ -169,15 +173,20 @@ out:
 	return op;
 }
 
-int pnvl_ops_flush(struct pnvl_ops *ops)
+int pnvl_ops_flush(struct pnvl_dev *pnvl_dev)
 {
-	unsigned long flags;
+	struct pnvl_ops *ops = &pnvl_dev->ops;
+	struct pnvl_op *op;
 	struct list_head *entry, *tmp;
+	unsigned long flags;
 
 	spin_lock_irqsave(&ops->lock, flags);
 	list_for_each_safe(entry, tmp, &ops->active) {
 		list_del(entry);
-		kfree(list_entry(entry, struct pnvl_op, list));
+		op = list_entry(entry, struct pnvl_op, list);
+		pnvl_dma_unpin_pages(&op->dma);
+		pnvl_dma_unmap_pages(&op->dma, pnvl_dev->pdev);
+		kfree(op);
 	}
 	list_for_each_safe(entry, tmp, &ops->inactive) {
 		list_del(entry);

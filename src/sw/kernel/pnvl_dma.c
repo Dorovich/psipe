@@ -8,9 +8,8 @@
 #include "pnvl_module.h"
 #include <linux/dma-mapping.h>
 
-int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
+int pnvl_dma_pin_pages(struct pnvl_dma *dma)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
 	int first_page, last_page, npages, pinned, rv;
 	unsigned ofs;
 
@@ -27,12 +26,38 @@ int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
 	if (!dma->pages)
 		return -ENOMEM;
 
+	/* BEGIN VMA CHECK */
+	struct vm_area_struct *vma;
+
+	down_read(&current->mm->mmap_lock);
+	vma = find_vma(current->mm, dma->addr);
+	up_read(&current->mm->mmap_lock);
+
+	if (!vma || dma->addr < vma->vm_start) {
+		pr_err("Address 0x%lx not mapped in process.\n", dma->addr);
+		return -EFAULT;
+	} else if (!(vma->vm_flags & VM_WRITE)) {
+		pr_err("Address 0x%lx is not writable", dma->addr);
+		return -EFAULT;
+	}
+	/* END VMA CHECK */
+
 	pinned = pin_user_pages_fast(dma->addr, npages,
 			FOLL_LONGTERM | FOLL_WRITE, dma->pages);
+	if (pinned == -EFAULT || pinned == -EAGAIN) { /* we can retry */
+		//pr_info("pin_user_pages - recoverable error, retrying\n");
+		down_read(&current->mm->mmap_lock);
+		pinned = pin_user_pages(dma->addr, npages,
+				FOLL_LONGTERM | FOLL_WRITE, dma->pages);
+		up_read(&current->mm->mmap_lock);
+	}
+
 	if (pinned < 0) {
+		//pr_info("pin_user_pages - error\n");
 		rv = pinned;
 		goto free_pages;
 	} else if (pinned != npages) {
+		//pr_info("pin_user_pages - too short (%d/%d)\n", pinned, npages);
 		rv = -EFAULT;
 		goto unpin_pages;
 	}
@@ -53,63 +78,52 @@ free_pages:
 	return rv;
 }
 
-int pnvl_dma_map_pages(struct pnvl_dev *pnvl_dev)
+int pnvl_dma_map_pages(struct pnvl_dma *dma, struct pci_dev *pdev)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-
-	dma->nmapped = dma_map_sg(&pnvl_dev->pdev->dev, dma->sgt.sgl,
-			dma->sgt.nents, dma->direction);
+	dma->nmapped = dma_map_sg(&pdev->dev, dma->sgt.sgl, dma->sgt.nents,
+			dma->direction);
 
 	return (int)dma->nmapped;
 }
 
-void pnvl_dma_write_setup(struct pnvl_dev *pnvl_dev, int mode,
+void pnvl_dma_write_setup(struct pnvl_dma *dma, struct pnvl_bar *bar, int mode,
 		enum dma_data_direction dir)
 {
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	struct pnvl_dma *dma = &pnvl_dev->dma;
 	dma->mode = mode;
 	dma->direction = dir;
-	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
+	iowrite32((u32)dma->mode, bar->mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
 }
 
-void pnvl_dma_write_maps(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_write_maps(struct pnvl_dma *dma, struct pnvl_bar *bar)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-	void __iomem *mmio = pnvl_dev->bar.mmio;
 	dma_addr_t handle;
 	struct scatterlist *sg;
 	unsigned ofs = 0;
 	int i;
 
-	iowrite32((u32)dma->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
-	iowrite32((u32)dma->nmapped, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
+	iowrite32((u32)dma->len, bar->mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
+	iowrite32((u32)dma->nmapped, bar->mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
 
 	for_each_sg(dma->sgt.sgl, sg, dma->nmapped, i) {
 		handle = sg_dma_address(sg);
-		iowrite32((u32)handle, mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
+		iowrite32((u32)handle,
+				bar->mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
 		ofs += sizeof(u32);
 	}
 }
 
-void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_doorbell_ring(struct pnvl_bar *bar)
 {
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
+	iowrite32(1, bar->mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
 }
 
-void pnvl_dma_unmap_pages(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_unmap_pages(struct pnvl_dma *dma, struct pci_dev *pdev)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-
-	dma_unmap_sg(&pnvl_dev->pdev->dev, dma->sgt.sgl, dma->sgt.nents,
-			dma->direction);
+	dma_unmap_sg(&pdev->dev, dma->sgt.sgl, dma->sgt.nents, dma->direction);
 }
 
-void pnvl_dma_unpin_pages(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_unpin_pages(struct pnvl_dma *dma)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-
 	unpin_user_pages(dma->pages, dma->npages);
 	kfree(dma->pages);
 }
