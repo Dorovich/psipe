@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
 		int i = g / sz_m;
 		int j = g % sz_m;
 		for (int k=0; k < sz_t; k++) {
+			/*
 			int a_idx = i*sz_t+k;
 			int b_idx = k*sz_m+j;
 			int c_idx = g-g_ofs;
@@ -133,11 +134,12 @@ int main(int argc, char *argv[])
 			else if (c_idx < 0 || c_idx >= g_len)
 				printf("incorrect C index for g=%d\n", g);
 			else {
+			*/
 				TYPE a = A[i*sz_t+k];
 				TYPE b = B[k*sz_m+j];
-				C[g-g_ofs] += (TYPE)(a*b);
+				C[g-g_ofs] += a * b;
 				//C[g-g_ofs] += A[i*sz_t+k] * B[k*sz_m+j];
-			}
+			//}
 		}
 	}
 	/* FUNCTION END ---------------------------------------- */
