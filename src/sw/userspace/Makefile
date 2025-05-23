@@ -5,8 +5,12 @@ build_dir := build/
 include_dir := $(abspath ../../../include/)
 includes := $(addprefix -I, $(include_dir))
 cflags := -static -static-libgcc -Wall -Werror -O2 $(includes)
-targets := master chiplet master-multi
-util := $(build_dir)pnvl_util.o
+#targets := master0 chiplet0 master1 chiplet1 master-mm chiplet-mm
+#util := $(build_dir)pnvl_util.o
+targets := master-mm chiplet-mm
+util := $(build_dir)pnvl_wrappers.o
+
+CC := riscv64-linux-gnu-gcc
 
 .PHONY : all
 all: $(targets) $(util)

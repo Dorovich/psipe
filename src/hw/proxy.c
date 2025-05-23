@@ -31,7 +31,7 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 		return;
 	}
 
-	printf("Server started, waiting for client...\n");
+	puts("Server started, waiting for client...");
 
 	proxy->client.sockd = accept(proxy->server.sockd,
 			(struct sockaddr *)&proxy->client.addr, &len);

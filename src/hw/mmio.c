@@ -36,7 +36,7 @@ static void pnvl_mmio_write_handle(DMAEngine *dma, hwaddr addr, uint64_t hnd)
 		return;
 
 	dma->config.handles[pos] = hnd;
-	printf("New handle: %#010lx @ %#010lx (pos=%d)\n", hnd, addr, pos);
+	printf("+ %#010lx at %#06lx (pos=%d)\n", hnd, addr, pos);
 }
 
 static uint64_t pnvl_mmio_read(void *opaque, hwaddr addr, unsigned int size)

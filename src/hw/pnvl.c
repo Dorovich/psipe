@@ -24,7 +24,6 @@ static void pnvl_device_init(PCIDevice *pci_dev, Error **errp)
 	pnvl_dma_init(dev, errp);
 	pnvl_mmio_init(dev, errp);
 	pnvl_proxy_init(dev, errp);
-	dev->ret = false;
 }
 
 static void pnvl_device_fini(PCIDevice *pci_dev)
@@ -43,7 +42,6 @@ static void pnvl_device_reset(DeviceState *dev_st)
 	pnvl_dma_reset(dev);
 	pnvl_mmio_reset(dev);
 	pnvl_proxy_reset(dev);
-	dev->ret = false;
 }
 
 /* ============================================================================
@@ -114,56 +112,36 @@ static void pnvl_transfer_pages(PNVLDevice *dev)
 {
 	int ret, len;
 
-	printf("BEGIN pnvl_transfer_pages\n");
+	printf("(TX) beginning - %lu\n", dev->dma.config.len);
 	if (pnvl_dma_begin_run(dev) < 0)
 		return;
 
 	do {
-		printf("%lu bytes left\n", dev->dma.current.len_left);
+		//printf("%lu bytes left\n", dev->dma.current.len_left);
 		len = pnvl_dma_rx_page(dev);
 		ret = pnvl_proxy_tx_page(dev, dev->dma.buff, len);
 	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
 
 	pnvl_dma_end_run(dev);
-	printf("DONE pnvl_transfer_pages (ret=%d)\n", ret);
+	printf("(TX) finished - %d\n", ret);
 }
 
 static void pnvl_receive_pages(PNVLDevice *dev)
 {
 	int ret, len;
 
-	printf("BEGIN pnvl_receive_pages\n");
+	printf("(RX) beginning - %lu\n", dev->dma.config.len);
 	if (pnvl_dma_begin_run(dev) < 0)
 		return;
 
 	do {
-		printf("%lu bytes left\n", dev->dma.current.len_left);
+		//printf("%lu bytes left\n", dev->dma.current.len_left);
 		len = pnvl_proxy_rx_page(dev, dev->dma.buff);
 		ret = pnvl_dma_tx_page(dev, len);
 	} while (ret != PNVL_FAILURE && !pnvl_dma_is_finished(dev));
 
 	pnvl_dma_end_run(dev);
-	printf("DONE pnvl_receive_pages (ret=%d)\n", ret);
-}
-
-static void pnvl_execute_active(PNVLDevice *dev)
-{
-	pnvl_transfer_pages(dev);
-	pnvl_receive_pages(dev);
-	if (dev->ret)
-		dev->ret = false;
-}
-
-static void pnvl_execute_passive(PNVLDevice *dev)
-{
-	if (!dev->ret) {
-		pnvl_proxy_await_req(dev, PNVL_REQ_SLN);
-		pnvl_receive_pages(dev);
-		dev->ret = true;
-	} else {
-		pnvl_transfer_pages(dev);
-		dev->ret = false;
-	}
+	printf("(RX) finished - %d\n", ret);
 }
 
 /* ============================================================================
@@ -173,16 +151,18 @@ static void pnvl_execute_passive(PNVLDevice *dev)
 
 void pnvl_execute(PNVLDevice *dev)
 {
+	printf(">>>>>>>>>> START RUN\n");
 	switch(dev->dma.mode) {
 	case DMA_MODE_ACTIVE:
-		pnvl_execute_active(dev);
+		pnvl_transfer_pages(dev);
 		break;
 	case DMA_MODE_PASSIVE:
-		pnvl_execute_passive(dev);
+		pnvl_proxy_await_req(dev, PNVL_REQ_SLN);
+		pnvl_receive_pages(dev);
 		break;
 	default:
 		return;
 	}
+	printf("<<<<<<<<<< END RUN\n");
 	pnvl_irq_raise(dev, PNVL_HW_IRQ_WORK_ENDED_VECTOR);
-	printf("IRQ RAISED\n");
 }

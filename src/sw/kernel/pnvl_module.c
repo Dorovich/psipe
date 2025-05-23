@@ -29,161 +29,51 @@ MODULE_DEVICE_TABLE(pci, pnvl_id_table);
 static int pnvl_open(struct inode *inode, struct file *fp)
 {
 	unsigned int bar = iminor(inode);
-	struct pnvl_dev *pnvl_dev = container_of(inode->i_cdev,
-						struct pnvl_dev, cdev);
+	struct pnvl_dev *pnvl_dev;
+
+	pnvl_dev = container_of(inode->i_cdev, struct pnvl_dev, cdev);
 
 	if (bar != 0)
 		return -ENXIO;
 	if (pnvl_dev->bar.len == 0)
 		return -EIO;
+
 	fp->private_data = pnvl_dev;
 
 	return 0;
 }
 
-static bool pnvl_copy_data(struct pnvl_dev *pnvl_dev, unsigned long arg)
+static bool pnvl_check_size_avail(struct pnvl_dma *dma, struct pnvl_bar *bar)
 {
-	struct pnvl_data *kdata = &pnvl_dev->data;
-	struct pnvl_data __user *udata = (void *)arg;
-	return (access_ok(udata, sizeof(*udata)) &&
-			!copy_from_user(kdata, udata, sizeof(*kdata)));
+	return dma->len <= ioread32(bar->mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
 }
 
-static bool pnvl_check_size_fit(struct pnvl_dev *pnvl_dev)
-{
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	size_t len_avail = ioread32(mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
-	return pnvl_dev->data.len <= len_avail;
-}
-
-static void pnvl_mode_active(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->dma.mode = PNVL_MODE_ACTIVE;
-	pnvl_dev->sending = true;
-	pnvl_dev->recving = false;
-}
-
-static void pnvl_mode_passive(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->dma.mode = PNVL_MODE_PASSIVE;
-	pnvl_dev->sending = false;
-	pnvl_dev->recving = true;
-}
-
-static void pnvl_mode_off(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->dma.mode = -1;
-	pnvl_dev->sending = false;
-	pnvl_dev->recving = false;
-}
-
-static int pnvl_ioctl_send(struct pnvl_dev *pnvl_dev, unsigned long arg)
-{
-	if (pnvl_dev->sending || pnvl_dev->recving)
-		return -EBUSY;
-	if (!pnvl_copy_data(pnvl_dev, arg))
-		return -EFAULT;
-	if(!pnvl_check_size_fit(pnvl_dev))
-		return -EMSGSIZE;
-
-	pnvl_mode_active(pnvl_dev);
-	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
-		goto send_err_pin;
-	if (pnvl_dma_get_handles(pnvl_dev) < 0)
-		goto send_err_map;
-
-	pnvl_dma_write_params(pnvl_dev);
-	pnvl_dma_doorbell_ring(pnvl_dev);
-
-	return 0;
-
-send_err_map:
-	pnvl_dma_unpin_pages(pnvl_dev);
-send_err_pin:
-	pnvl_mode_off(pnvl_dev);
-	return -ENOMEM;
-}
-
-static int pnvl_ioctl_recv(struct pnvl_dev *pnvl_dev, unsigned long arg)
-{
-	if (pnvl_dev->sending || pnvl_dev->recving)
-		return -EBUSY;
-	if (!pnvl_copy_data(pnvl_dev, arg))
-		return -EFAULT;
-
-	pnvl_mode_passive(pnvl_dev);
-	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
-		goto recv_err_pin;
-	if (pnvl_dma_get_handles(pnvl_dev) < 0)
-		goto recv_err_map;
-
-	pnvl_dma_write_params(pnvl_dev);
-	pnvl_dma_doorbell_ring(pnvl_dev);
-	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-
-	return 0;
-
-recv_err_map:
-	pnvl_dma_unpin_pages(pnvl_dev);
-recv_err_pin:
-	pnvl_mode_off(pnvl_dev);
-	return -ENOMEM;
-}
-
-static int pnvl_ioctl_wait(struct pnvl_dev *pnvl_dev)
-{
-	if (!pnvl_dev->sending)
-		return -EINVAL;
-
-	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_release_handles(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-	pnvl_mode_off(pnvl_dev);
-
-	return 0;
-}
-
-static int pnvl_ioctl_return(struct pnvl_dev *pnvl_dev)
-{
-	if (!pnvl_dev->recving)
-		return -EINVAL;
-
-	pnvl_mode_active(pnvl_dev);
-	if (pnvl_dma_pin_pages(pnvl_dev) < 0)
-		goto return_err_pin;
-
-	pnvl_dma_doorbell_ring(pnvl_dev);
-	pnvl_dma_wait(pnvl_dev);
-	pnvl_dma_release_handles(pnvl_dev);
-	pnvl_dma_unpin_pages(pnvl_dev);
-	pnvl_mode_off(pnvl_dev);
-
-	return 0;
-
-return_err_pin:
-	pnvl_mode_off(pnvl_dev);
-	return -ENOMEM;
-}
-
+	return (long)rv;
 static long pnvl_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
 	struct pnvl_dev *pnvl_dev = fp->private_data;
+	struct pnvl_op *op;
+	pnvl_handle_t id;
+	long rv = -ENOTTY;
 
 	switch(cmd) {
 	case PNVL_IOCTL_SEND:
-		return pnvl_ioctl_send(pnvl_dev, arg);
 	case PNVL_IOCTL_RECV:
-		return pnvl_ioctl_recv(pnvl_dev, arg);
+		op = pnvl_ops_new(cmd, arg);
+		id = pnvl_ops_init(pnvl_dev, op);
+		rv = (long)id;
+		break;
 	case PNVL_IOCTL_WAIT:
-		return pnvl_ioctl_wait(pnvl_dev);
-	case PNVL_IOCTL_RETURN:
-		return pnvl_ioctl_return(pnvl_dev);
-	default:
-		return -ENOTTY;
+		id = (pnvl_handle_t)arg;
+		op = pnvl_ops_get(&pnvl_dev->ops, id);
+		rv = pnvl_ops_wait(op);
+		break;
+	case PNVL_IOCTL_FLUSH:
+		rv = pnvl_ops_flush(pnvl_dev);
+		break;
 	}
 
-	return 0;
+	return rv;
 }
 
 static const struct file_operations pnvl_fops = {
@@ -218,11 +108,10 @@ static int pnvl_dev_init(struct pnvl_dev *pnvl_dev, struct pci_dev *pdev)
 	}
 	pci_set_drvdata(pdev, pnvl_dev);
 
-	pnvl_dev->wq_flag = 0;
-	init_waitqueue_head(&pnvl_dev->wq);
-
-	pnvl_dev->dma.direction = DMA_BIDIRECTIONAL;
-	pnvl_mode_off(pnvl_dev);
+	spin_lock_init(&pnvl_dev->ops.lock);
+	INIT_LIST_HEAD(&pnvl_dev->ops.active);
+	INIT_LIST_HEAD(&pnvl_dev->ops.inactive);
+	pnvl_dev->ops.next_id = 0;
 
 	return 0;
 }
@@ -326,8 +215,6 @@ static int pnvl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_irq_enable;
 	}
 
-	memset(&pnvl_dev->data, 0, sizeof(pnvl_dev->data));
-
 	dev_info(&pdev->dev, "pnvl probe - success\n");
 
 	return 0;
@@ -380,7 +267,9 @@ static void pnvl_remove(struct pci_dev *pdev)
 	pci_release_selected_regions(pdev, pci_select_bars(pdev,
 				IORESOURCE_MEM));
 	pci_disable_device(pdev);
+
 	kfree(pnvl_dev);
+
 	dev_info(&pdev->dev, "pnvl remove - success\n");
 }
 

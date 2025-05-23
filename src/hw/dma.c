@@ -41,13 +41,13 @@ static inline void pnvl_dma_init_current(DMAEngine *dma)
 
 static int pnvl_dma_read(PNVLDevice *dev, dma_addr_t addr, int len, int ofs)
 {
-	printf("DMA RD: %d bytes @ %#010lx\n", len, addr);
+	//printf("DMA RD: %d bytes @ %#010lx\n", len, addr);
 	return pci_dma_read(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
 }
 
 static int pnvl_dma_write(PNVLDevice *dev, dma_addr_t addr, int len, int ofs)
 {
-	printf("DMA WR: %d bytes @ %#010lx\n", len, addr);
+	//printf("DMA WR: %d bytes @ %#010lx\n", len, addr);
 	return pci_dma_write(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
 }
 

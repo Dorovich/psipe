@@ -8,118 +8,122 @@
 #include "pnvl_module.h"
 #include <linux/dma-mapping.h>
 
-int pnvl_dma_pin_pages(struct pnvl_dev *pnvl_dev)
+int pnvl_dma_pin_pages(struct pnvl_dma *dma)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-	struct pnvl_data *data = &pnvl_dev->data;
-	int first_page, last_page, npages, pinned;
+	int first_page, last_page, npages, pinned, rv;
+	unsigned ofs;
 
-	first_page = (data->addr & PAGE_MASK) >> PAGE_SHIFT;
-	last_page = ((data->addr + data->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
+	ofs = dma->addr & ~PAGE_MASK;
+	first_page = (dma->addr & PAGE_MASK) >> PAGE_SHIFT;
+	last_page = ((dma->addr + dma->len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	npages = last_page - first_page + 1;
-	if (npages > PNVL_HW_BAR0_DMA_HANDLES_CNT)
-		return -1;
-	pinned = pin_user_pages_fast(data->addr, npages, FOLL_LONGTERM,
-			dma->pages);
-
 	dma->npages = npages;
-	return -(pinned != npages);
-}
 
-int pnvl_dma_get_handles(struct pnvl_dev *pnvl_dev)
-{
-	struct pci_dev *pdev = pnvl_dev->pdev;
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-	dma_addr_t *handles;
-	size_t len, len_map, ofs;
+	if (npages <= 0 || npages > PNVL_HW_BAR0_DMA_HANDLES_CNT)
+		return -EMSGSIZE;
 
-	handles = kcalloc(dma->npages, sizeof(*handles), GFP_KERNEL);
+	dma->pages = kmalloc_array(npages, sizeof(struct page *), GFP_KERNEL);
+	if (!dma->pages)
+		return -ENOMEM;
 
-	len = dma->len;
-	ofs = pnvl_dev->data.addr & ~PAGE_MASK;
-	len_map = PAGE_SIZE - ofs;
-	if (len_map > len)
-		len_map = len;
-	len -= len_map;
-	handles[0] = dma_map_page(&pdev->dev, dma->pages[0], ofs, len_map,
-			dma->direction);
-	if (dma_mapping_error(&pdev->dev, handles[0]))
-		goto err_dma_map;
+	/* BEGIN VMA CHECK */
+	struct vm_area_struct *vma;
 
-	for (int i = 1; i < dma->npages; ++i) {
-		len_map = len > PAGE_SIZE ?  PAGE_SIZE : len;
-		len -= len_map;
-		handles[i] = dma_map_page(&pdev->dev, dma->pages[i], 0,
-				len_map, dma->direction);
-		if (dma_mapping_error(&pdev->dev, handles[i]))
-			goto err_dma_map;
+	down_read(&current->mm->mmap_lock);
+	vma = find_vma(current->mm, dma->addr);
+	up_read(&current->mm->mmap_lock);
+
+	if (!vma || dma->addr < vma->vm_start) {
+		pr_err("Address 0x%lx not mapped in process.\n", dma->addr);
+		return -EFAULT;
+	} else if (!(vma->vm_flags & VM_WRITE)) {
+		pr_err("Address 0x%lx is not writable", dma->addr);
+		return -EFAULT;
+	}
+	/* END VMA CHECK */
+
+	pinned = pin_user_pages_fast(dma->addr, npages,
+			FOLL_LONGTERM | FOLL_WRITE, dma->pages);
+	if (pinned == -EFAULT || pinned == -EAGAIN) { /* we can retry */
+		//pr_info("pin_user_pages - recoverable error, retrying\n");
+		down_read(&current->mm->mmap_lock);
+		pinned = pin_user_pages(dma->addr, npages,
+				FOLL_LONGTERM | FOLL_WRITE, dma->pages);
+		up_read(&current->mm->mmap_lock);
 	}
 
-	dma->dma_handles = handles;
+	if (pinned < 0) {
+		//pr_info("pin_user_pages - error\n");
+		rv = pinned;
+		goto free_pages;
+	} else if (pinned != npages) {
+		//pr_info("pin_user_pages - too short (%d/%d)\n", pinned, npages);
+		rv = -EFAULT;
+		goto unpin_pages;
+	}
+
+	rv = sg_alloc_table_from_pages_segment(&dma->sgt, dma->pages, npages,
+			ofs, dma->len, PAGE_SIZE, GFP_KERNEL);
+	if (rv < 0)
+		goto free_table;
+
 	return 0;
 
-err_dma_map:
-	kfree(handles);
-	return -ENOMEM;
+free_table:
+	sg_free_table(&dma->sgt);
+unpin_pages:
+	unpin_user_pages(dma->pages, pinned);
+free_pages:
+	kfree(dma->pages);
+	return rv;
 }
 
-void pnvl_dma_write_params(struct pnvl_dev *pnvl_dev)
+int pnvl_dma_map_pages(struct pnvl_dma *dma, struct pci_dev *pdev)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-	struct pnvl_data *data = &pnvl_dev->data;
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	size_t ofs = 0;
+	dma->nmapped = dma_map_sg(&pdev->dev, dma->sgt.sgl, dma->sgt.nents,
+			dma->direction);
 
-	if (dma->mode == PNVL_MODE_PASSIVE) {
-		iowrite32((u32)data->len,
-				mmio + PNVL_HW_BAR0_DMA_CFG_LEN_AVAIL);
-	}
+	return (int)dma->nmapped;
+}
 
-	iowrite32((u32)data->len, mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
-	iowrite32((u32)dma->npages, mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
-	iowrite32((u32)dma->mode, mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
+void pnvl_dma_write_setup(struct pnvl_dma *dma, struct pnvl_bar *bar, int mode,
+		enum dma_data_direction dir)
+{
+	dma->mode = mode;
+	dma->direction = dir;
+	iowrite32((u32)dma->mode, bar->mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
+}
 
-	for (int i = 0; i < dma->npages; ++i) {
-		iowrite32((u32)dma->dma_handles[i],
-			mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
+void pnvl_dma_write_maps(struct pnvl_dma *dma, struct pnvl_bar *bar)
+{
+	dma_addr_t handle;
+	struct scatterlist *sg;
+	unsigned ofs = 0;
+	int i;
+
+	iowrite32((u32)dma->len, bar->mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
+	iowrite32((u32)dma->nmapped, bar->mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
+
+	for_each_sg(dma->sgt.sgl, sg, dma->nmapped, i) {
+		handle = sg_dma_address(sg);
+		iowrite32((u32)handle,
+				bar->mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
 		ofs += sizeof(u32);
 	}
 }
 
-void pnvl_dma_doorbell_ring(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_doorbell_ring(struct pnvl_bar *bar)
 {
-	void __iomem *mmio = pnvl_dev->bar.mmio;
-	iowrite32(1, mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
+	iowrite32(1, bar->mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
 }
 
-void pnvl_dma_release_handles(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_unmap_pages(struct pnvl_dma *dma, struct pci_dev *pdev)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-
-	for (int i = 0; i < dma->npages; ++i) {
-		dma_unmap_page(&pnvl_dev->pdev->dev, dma->dma_handles[i],
-			dma->len, dma->direction);
-	}
-
-	kfree(dma->dma_handles);
+	dma_unmap_sg(&pdev->dev, dma->sgt.sgl, dma->sgt.nents, dma->direction);
 }
 
-void pnvl_dma_unpin_pages(struct pnvl_dev *pnvl_dev)
+void pnvl_dma_unpin_pages(struct pnvl_dma *dma)
 {
-	struct pnvl_dma *dma = &pnvl_dev->dma;
-	for (int i = 0; i < dma->npages; ++i)
-		unpin_user_page(dma->pages[i]);
-}
-
-void pnvl_dma_wait(struct pnvl_dev *pnvl_dev)
-{
-	if (!pnvl_dev->wq_flag)
-		wait_event(pnvl_dev->wq, pnvl_dev->wq_flag == 1);
-	pnvl_dev->wq_flag = 0;
-}
-
-void pnvl_dma_wake(struct pnvl_dev *pnvl_dev)
-{
-	pnvl_dev->wq_flag = 1;
-	wake_up(&pnvl_dev->wq);
+	unpin_user_pages(dma->pages, dma->npages);
+	kfree(dma->pages);
 }
