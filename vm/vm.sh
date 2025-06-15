@@ -2,7 +2,7 @@
 
 # qemu params
 name="Linux 6.6.72 on riscv64"
-suffix="PNVL[client]"
+mode="client"
 monitor="none"
 
 # device params
@@ -26,13 +26,23 @@ while getopts "Ddsp:n:mMu" opt; do
 			;;
 		s) # ACT AS SERVER
 			server=on
-			suffix="PNVL[server]"
+			mode="server"
 			;;
 		p) # CHANGE THE BASE PORT
 			port_base=$OPTARG
+			if [[ -z "$port_base" || ! "$port_base" =~ ^[0-9]+$ || "$port_base" -lt 1025 ]]
+			then
+				echo "(-p) must be a positive integer"
+				exit 1
+			fi
 			;;
 		n) # NUMBER OF DEVICES
 			instances=$OPTARG
+			if [[ -z "$instances" || ! "$instances" =~ ^[0-9]+$ || "$instances" -lt 0 ]]
+			then
+				echo "(-n) must be a positive integer"
+				exit 1
+			fi
 			;;
 		m) # USE QEMU MONITOR
 			monitor="stdio"
@@ -41,7 +51,7 @@ while getopts "Ddsp:n:mMu" opt; do
 			instances=0
 			ronly=off
 			lock=on
-			suffix="MAINTENANCE"
+			mode="maintenance"
 			;;
 		u) # UPDATE DISK IMAGE
 			./manage-disk.sh -iur
@@ -54,16 +64,6 @@ while getopts "Ddsp:n:mMu" opt; do
 	esac
 done
 shift $((OPTIND-1))
-
-if [[ -z "$port_base" || ! "$port_base" =~ ^[0-9]+$ || "$port_base" -lt 1025 ]]; then
-	echo "(-p) must be a positive integer"
-	exit 1
-fi
-
-if [[ -z "$instances" || ! "$instances" =~ ^[0-9]+$ || "$instances" -lt 0 ]]; then
-	echo "(-n) must be a positive integer"
-	exit 1
-fi
 
 args=""
 for i in $(seq 1 $instances); do
@@ -79,9 +79,9 @@ done
 	-smp 1 \
 	-drive file=$disk,format=raw,if=none,id=hd0,read-only=$ronly,file.locking=$lock \
 	-device virtio-blk-device,drive=hd0 \
-	-kernel ~/src/proto-nvlink/linux-6.6.72/arch/riscv/boot/Image \
+	-kernel ../linux-6.6.72/arch/riscv/boot/Image \
 	-append "nokaslr root=/dev/vda1 rw console=ttyS0" \
 	-monitor $monitor \
-	-name "$name - $suffix" \
+	-name "$name - PNVL[$instances:$mode]" \
 	$args \
 	$debug_qemu
