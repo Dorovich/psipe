@@ -1,7 +1,8 @@
 #!/bin/env bash
 
 # qemu params
-name="Linux 6.6.72 on riscv64 PNVL-client"
+name="Linux 6.6.72 on riscv64"
+suffix="PNVL[client]"
 monitor="none"
 
 # device params
@@ -15,17 +16,17 @@ disk="vda.img"
 ronly=on
 lock=off
 
-while getopts "Ddsp:n:mM" opt; do
+while getopts "Ddsp:n:mMu" opt; do
 	case "$opt" in
 		D) # DEBUG QEMU
 			debug_qemu="-s"
 			;;
-		d) # DEBUG THE DEVICE (W.I.P.)
+		d) # DEBUG THE DEVICE (not implemented)
 			debug_dev=on
 			;;
 		s) # ACT AS SERVER
 			server=on
-			name="Linux 6.6.72 on riscv64 PNVL-server"
+			suffix="PNVL[server]"
 			;;
 		p) # CHANGE THE BASE PORT
 			port_base=$OPTARG
@@ -40,7 +41,11 @@ while getopts "Ddsp:n:mM" opt; do
 			instances=0
 			ronly=off
 			lock=on
-			name="Linux 6.6.72 on riscv64 MAINTENANCE"
+			suffix="MAINTENANCE"
+			;;
+		u) # UPDATE DISK IMAGE
+			./manage-disk.sh -iur
+			exit 0
 			;;
 		*)
 			echo "Exited. Check the $0 file for flag info."
@@ -67,7 +72,7 @@ for i in $(seq 1 $instances); do
 done
 
 #qemu-system-riscv64 \
-~/src/proto-nvlink/qemu/build/qemu-system-riscv64 \
+../qemu/build/qemu-system-riscv64 \
 	-machine virt \
 	-cpu rv64 \
 	-m 2G \
@@ -77,6 +82,6 @@ done
 	-kernel ~/src/proto-nvlink/linux-6.6.72/arch/riscv/boot/Image \
 	-append "nokaslr root=/dev/vda1 rw console=ttyS0" \
 	-monitor $monitor \
-	-name "$name" \
+	-name "$name - $suffix" \
 	$args \
 	$debug_qemu
