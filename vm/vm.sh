@@ -68,7 +68,7 @@ shift $((OPTIND-1))
 args=""
 for i in $(seq 1 $instances); do
 	port=$((port_base + i))
-	args="$args -device pnvl,server_mode=$server,port=$port"
+	args="$args -device psipe,server_mode=$server,port=$port"
 done
 
 #qemu-system-riscv64 \
@@ -82,6 +82,6 @@ done
 	-kernel ../linux-6.6.72/arch/riscv/boot/Image \
 	-append "nokaslr root=/dev/vda1 rw console=ttyS0" \
 	-monitor $monitor \
-	-name "$name - PNVL[$instances:$mode]" \
+	-name "$name - PSIPE[$instances:$mode]" \
 	$args \
 	$debug_qemu

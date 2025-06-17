@@ -10,14 +10,14 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include "hw/pnvl_hw.h"
-#include "sw/module/pnvl_ioctl.h"
-#include "pnvl_util.h"
+#include "hw/psipe_hw.h"
+#include "sw/module/psipe_ioctl.h"
+#include "psipe_util.h"
 
 static int handle_work(struct context_multi *ctx)
 {
 	struct timeval t1, t2, t3;
-	struct pnvl_data data = {
+	struct psipe_data data = {
 		.addr = (unsigned long)ctx->data,
 		.len = (unsigned long)(ctx->data_len * sizeof(int)),
 	};
@@ -26,24 +26,24 @@ static int handle_work(struct context_multi *ctx)
 		puts("Waiting for data...");
 
 		gettimeofday(&t1, NULL);
-		if (ioctl(ctx->fds[i], PNVL_IOCTL_ARECV, &data) < 0) {
-			perror("PNVL_IOCTL_ARECV failed!");
+		if (ioctl(ctx->fds[i], PSIPE_IOCTL_ARECV, &data) < 0) {
+			perror("PSIPE_IOCTL_ARECV failed!");
 			return -1;
 		}
 		gettimeofday(&t2, NULL);
-		printf("PNVL_IOCTL_ARECV: %ld us elapsed\n",
+		printf("PSIPE_IOCTL_ARECV: %ld us elapsed\n",
 				calc_time(&t1, &t2));
 
 		for (int i = 0; i < data.len/sizeof(int); ++i)
 			((int *)data.addr)[i] = i;
 
 		gettimeofday(&t2, NULL);
-		if (ioctl(ctx->fds[i], PNVL_IOCTL_RETURN) < 0) {
-			perror("PNVL_IOCTL_RETURN failed!");
+		if (ioctl(ctx->fds[i], PSIPE_IOCTL_RETURN) < 0) {
+			perror("PSIPE_IOCTL_RETURN failed!");
 			return -1;
 		}
 		gettimeofday(&t3, NULL);
-		printf("PNVL_IOCTL_RETURN: %ld us elapsed\n",
+		printf("PSIPE_IOCTL_RETURN: %ld us elapsed\n",
 				calc_time(&t2, &t3));
 
 		printf("TOTAL: %ld us elapsed\n",

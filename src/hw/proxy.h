@@ -1,62 +1,64 @@
-/* proxy.h - External access to Proto-NVLink memory
+/* proxy.h - External access to Proto-SIPE memory
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
-#ifndef PNVL_PROXY_H
-#define PNVL_PROXY_H
+#ifndef PSIPE_PROXY_H
+#define PSIPE_PROXY_H
 
 #include "qemu/osdep.h"
 #include "qemu/typedefs.h"
 #include <sys/socket.h>
 
-#define PNVL_PROXY_HOST "localhost"
-#define PNVL_PROXY_PORT 8987
-#define PNVL_PROXY_BUFF PAGE_SIZE
-#define PNVL_PROXY_MAXQ 1
+#define PSIPE_PROXY_HOST "localhost"
+#define PSIPE_PROXY_PORT 8987
+#define PSIPE_PROXY_BUFF PAGE_SIZE
+#define PSIPE_PROXY_MAXQ 1
 
-#define PNVL_REQ_NIL 0x0
-#define PNVL_REQ_ACK 0x1 /* general acknowledge */
-#define PNVL_REQ_SYN 0x2 /* start syncing page data */
-#define PNVL_REQ_RST 0x3 /* reset machine */
-#define PNVL_REQ_SLN 0x4 /* send your available length */
-#define PNVL_REQ_RLN 0x5 /* receive my available length */
+#define PSIPE_REQ_NIL 0x0
+#define PSIPE_REQ_ACK 0x1 /* general acknowledge */
+#define PSIPE_REQ_SYN 0x2 /* start syncing page data */
+#define PSIPE_REQ_RST 0x3 /* reset machine */
+#define PSIPE_REQ_SLN 0x4 /* send your available length */
+#define PSIPE_REQ_RLN 0x5 /* receive my available length */
 
 /* Forward declaration */
-typedef struct PNVLDevice PNVLDevice;
+typedef struct PSIPEDevice PSIPEDevice;
 
 typedef unsigned int ProxyRequest;
 
-typedef struct PNVLProxyConn {
+typedef struct PSIPEProxyConn {
 	int sockd;
 	struct sockaddr_in addr;
-} PNVLProxyConn;
+} PSIPEProxyConn;
 
-typedef struct PNVLProxy {
-	PNVLProxyConn server;
-	PNVLProxyConn client;
+typedef struct PSIPEProxy {
+	PSIPEProxyConn server;
+	PSIPEProxyConn client;
 	bool server_mode;
 	uint16_t port;
-} PNVLProxy;
+} PSIPEProxy;
 
 /* ============================================================================
  * Public
  * ============================================================================
  */
 
-int pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff);
-int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, int len);
+int psipe_proxy_rx_page(PSIPEDevice *dev, uint8_t *buff);
+int psipe_proxy_tx_page(PSIPEDevice *dev, uint8_t *buff, int len);
 
-bool pnvl_proxy_get_mode(Object *obj, Error **errp);
-void pnvl_proxy_set_mode(Object *obj, bool mode, Error **errp);
+bool psipe_proxy_get_mode(Object *obj, Error **errp);
+void psipe_proxy_set_mode(Object *obj, bool mode, Error **errp);
 
-int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req);
-int pnvl_proxy_wait_and_handle_req(PNVLDevice *dev);
-int pnvl_proxy_await_req(PNVLDevice *dev, ProxyRequest req);
+int psipe_proxy_issue_req(PSIPEDevice *dev, ProxyRequest req);
+int psipe_proxy_wait_and_handle_req(PSIPEDevice *dev);
+int psipe_proxy_await_req(PSIPEDevice *dev, ProxyRequest req);
 
-void pnvl_proxy_reset(PNVLDevice *dev);
-void pnvl_proxy_init(PNVLDevice *dev, Error **errp);
-void pnvl_proxy_fini(PNVLDevice *dev);
+void psipe_proxy_reset(PSIPEDevice *dev);
+void psipe_proxy_init(PSIPEDevice *dev, Error **errp);
+void psipe_proxy_fini(PSIPEDevice *dev);
 
-#endif /* PNVL_PROXY_H */
+#endif /* PSIPE_PROXY_H */

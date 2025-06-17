@@ -7,7 +7,7 @@
 #include <malloc.h>
 #include <math.h>
 #include <errno.h>
-#include "pnvl_wrappers.h"
+#include "psipe_wrappers.h"
 #include <signal.h>
 
 static void sighup_handler(int signo)
@@ -18,7 +18,7 @@ static void sighup_handler(int signo)
 
 #define TYPE double
 
-struct pnvl_devices *pnvl_devs;
+struct psipe_devices *psipe_devs;
 
 /* ORIGINAL FUNCTION
 static void matmul_func(int sz_n, int sz_t, int sz_m,
@@ -46,19 +46,19 @@ int main(int argc, char *argv[])
 	void *pt_A = NULL, *pt_B = NULL, *pt_C = NULL;
 	size_t sz_A, sz_B, sz_C;
 	int sz_n, sz_t, sz_m, g_len, g_ofs, fd;
-	pnvl_handle_t id;
+	psipe_handle_t id;
 
-	pnvl_open_devs();
-	fd = pnvl_devs->fds[0];
+	psipe_open_devs();
+	fd = psipe_devs->fds[0];
 
-	id = pnvl_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
+	id = psipe_recv_args(fd, &sz_n, &sz_t, &sz_m, &g_len, &g_ofs);
 	if (id < 0) {
-		perror("pnvl_recv_args");
+		perror("psipe_recv_args");
 		exit(1);
 	}
 
-	if (pnvl_wait(fd, id) < 0) {
-		perror("pnvl_wait(args)");
+	if (psipe_wait(fd, id) < 0) {
+		perror("psipe_wait(args)");
 		exit(1);
 	}
 
@@ -82,37 +82,37 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	id = pnvl_recv(fd, pt_A, sz_A);
+	id = psipe_recv(fd, pt_A, sz_A);
 	if ((long)id < 0) {
-		perror("pnvl_recv(A)");
+		perror("psipe_recv(A)");
 		exit(1);
 	}
 #if WAIT_ALL_OPS
-	if (pnvl_wait(fd, id) < 0) {
-		perror("pnvl_wait(A)");
+	if (psipe_wait(fd, id) < 0) {
+		perror("psipe_wait(A)");
 		exit(1);
 	}
 #endif
 
-	id = pnvl_recv(fd, pt_B, sz_B);
+	id = psipe_recv(fd, pt_B, sz_B);
 	if ((long)id < 0) {
-		perror("pnvl_recv(B)");
+		perror("psipe_recv(B)");
 		exit(1);
 	}
 #if WAIT_ALL_OPS
-	if (pnvl_wait(fd, id) < 0) {
-		perror("pnvl_wait(B)");
+	if (psipe_wait(fd, id) < 0) {
+		perror("psipe_wait(B)");
 		exit(1);
 	}
 #endif
 
-	id = pnvl_recv(fd, pt_C, sz_C);
+	id = psipe_recv(fd, pt_C, sz_C);
 	if ((long)id < 0) {
-		perror("pnvl_recv(C)");
+		perror("psipe_recv(C)");
 		exit(1);
 	}
-	if (pnvl_wait(fd, id) < 0) {
-		perror("pnvl_wait(C)");
+	if (psipe_wait(fd, id) < 0) {
+		perror("psipe_wait(C)");
 		exit(1);
 	}
 
@@ -144,18 +144,18 @@ int main(int argc, char *argv[])
 	}
 	/* FUNCTION END ---------------------------------------- */
 
-	id = pnvl_send(fd, pt_C, sz_C);
+	id = psipe_send(fd, pt_C, sz_C);
 	if ((long)id < 0) {
-		perror("pnvl_send(C)");
+		perror("psipe_send(C)");
 		exit(1);
 	}
-	if (pnvl_wait(fd, id) < 0) {
-		perror("pnvl_wait(C)");
+	if (psipe_wait(fd, id) < 0) {
+		perror("psipe_wait(C)");
 		exit(1);
 	}
 
-	pnvl_flush(fd);
-	pnvl_close_devs();
+	psipe_flush(fd);
+	psipe_close_devs();
 	free(pt_A);
 	free(pt_B);
 	free(pt_C);

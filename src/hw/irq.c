@@ -1,12 +1,15 @@
-/* irq.h - Interrupt Request operations
+/* irq.c - Interrupt Request operations
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ * Copyright (c) 2023 Luiz Henrique Suraty Filho <luiz-dev@suraty.com> (pciemu)
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
 #include "qemu/osdep.h"
 #include "hw/pci/msi.h"
-#include "pnvl.h"
+#include "psipe.h"
 #include "irq.h"
 
 /* ============================================================================
@@ -14,34 +17,34 @@
  * ============================================================================
  */
 
-static inline void pnvl_irq_init_intx(PNVLDevice *dev, Error **errp)
+static inline void psipe_irq_init_intx(PSIPEDevice *dev, Error **errp)
 {
 	uint8_t *conf = dev->pci_dev.config;
-	pci_config_set_interrupt_pin(conf, PNVL_HW_IRQ_INTX + 1);
+	pci_config_set_interrupt_pin(conf, PSIPE_HW_IRQ_INTX + 1);
 }
 
-static inline void pnvl_irq_init_msi(PNVLDevice *dev, Error **errp)
+static inline void psipe_irq_init_msi(PSIPEDevice *dev, Error **errp)
 {
-	msi_init(&dev->pci_dev, 0, PNVL_HW_IRQ_CNT, true, false, errp);
+	msi_init(&dev->pci_dev, 0, PSIPE_HW_IRQ_CNT, true, false, errp);
 }
 
-static inline void pnvl_irq_raise_intx(PNVLDevice *dev)
+static inline void psipe_irq_raise_intx(PSIPEDevice *dev)
 {
 	dev->irq.pin.raised = true;
 	pci_set_irq(&dev->pci_dev, 1);
 }
 
-static inline void pnvl_irq_lower_intx(PNVLDevice *dev)
+static inline void psipe_irq_lower_intx(PSIPEDevice *dev)
 {
 	dev->irq.pin.raised = false;
 	pci_set_irq(&dev->pci_dev, 0);
 }
 
-static inline void pnvl_irq_raise_msi(PNVLDevice *dev, unsigned int vector)
+static inline void psipe_irq_raise_msi(PSIPEDevice *dev, unsigned int vector)
 {
 	MSIVector *vec;
 
-	if (vector >= PNVL_IRQ_MAX_VECS)
+	if (vector >= PSIPE_IRQ_MAX_VECS)
 		return;
 
 	vec = &dev->irq.msi.msi_vectors[vector];
@@ -49,11 +52,11 @@ static inline void pnvl_irq_raise_msi(PNVLDevice *dev, unsigned int vector)
 	msi_notify(&dev->pci_dev, vector);
 }
 
-static inline void pnvl_irq_lower_msi(PNVLDevice *dev, unsigned int vector)
+static inline void psipe_irq_lower_msi(PSIPEDevice *dev, unsigned int vector)
 {
 	MSIVector *vec;
 
-	if (vector >= PNVL_IRQ_MAX_VECS)
+	if (vector >= PSIPE_IRQ_MAX_VECS)
 		return;
 
 	vec = &dev->irq.msi.msi_vectors[vector];
@@ -66,36 +69,36 @@ static inline void pnvl_irq_lower_msi(PNVLDevice *dev, unsigned int vector)
  * ============================================================================
  */
 
-void pnvl_irq_raise(PNVLDevice *dev, unsigned int vector)
+void psipe_irq_raise(PSIPEDevice *dev, unsigned int vector)
 {
 	if (msi_enabled(&dev->pci_dev))
-		pnvl_irq_raise_msi(dev, vector);
+		psipe_irq_raise_msi(dev, vector);
 	else
-		pnvl_irq_raise_intx(dev);
+		psipe_irq_raise_intx(dev);
 }
 
-void pnvl_irq_lower(PNVLDevice *dev, unsigned int vector)
+void psipe_irq_lower(PSIPEDevice *dev, unsigned int vector)
 {
 	if (msi_enabled(&dev->pci_dev))
-		pnvl_irq_lower_msi(dev, vector);
+		psipe_irq_lower_msi(dev, vector);
 	else
-		pnvl_irq_lower_intx(dev);
+		psipe_irq_lower_intx(dev);
 }
 
-void pnvl_irq_reset(PNVLDevice *dev)
+void psipe_irq_reset(PSIPEDevice *dev)
 {
-	for (int i = 0; i < PNVL_HW_IRQ_CNT; ++i)
-		pnvl_irq_lower(dev, i);
+	for (int i = 0; i < PSIPE_HW_IRQ_CNT; ++i)
+		psipe_irq_lower(dev, i);
 }
 
-void pnvl_irq_init(PNVLDevice *dev, Error **errp)
+void psipe_irq_init(PSIPEDevice *dev, Error **errp)
 {
-	pnvl_irq_init_intx(dev, errp);
-	pnvl_irq_init_msi(dev, errp);
+	psipe_irq_init_intx(dev, errp);
+	psipe_irq_init_msi(dev, errp);
 }
 
-void pnvl_irq_fini(PNVLDevice *dev)
+void psipe_irq_fini(PSIPEDevice *dev)
 {
-	pnvl_irq_reset(dev);
+	psipe_irq_reset(dev);
 	msi_uninit(&dev->pci_dev);
 }

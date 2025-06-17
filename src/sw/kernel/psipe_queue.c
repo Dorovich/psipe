@@ -1,38 +1,40 @@
-/* pnvl_queue.c - pnvl ioctl operations queue management
+/* psipe_queue.c - psipe ioctl operations queue management
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
-#include "pnvl_module.h"
+#include "psipe_module.h"
 
-struct pnvl_op *pnvl_ops_new(unsigned int cmd, unsigned long uarg)
+struct psipe_op *psipe_ops_new(unsigned int cmd, unsigned long uarg)
 {
 	int rv;
-	struct pnvl_data data;
+	struct psipe_data data;
 
-	struct pnvl_op *op = kmalloc(sizeof(*op), GFP_KERNEL);
+	struct psipe_op *op = kmalloc(sizeof(*op), GFP_KERNEL);
 	if (!op)
 		goto out;
 
 	switch(cmd) {
-	case PNVL_IOCTL_SEND:
+	case PSIPE_IOCTL_SEND:
 		rv = copy_from_user(&data, (void *)uarg, sizeof(data));
 		if (rv < 0)
 			goto clean;
 		op->dma.addr = data.addr;
 		op->dma.len = data.len;
-		op->dma.mode = PNVL_MODE_OFF;
-		op->ioctl_fn = pnvl_ioctl_send;
+		op->dma.mode = PSIPE_MODE_OFF;
+		op->ioctl_fn = psipe_ioctl_send;
 		break;
-	case PNVL_IOCTL_RECV:
+	case PSIPE_IOCTL_RECV:
 		rv = copy_from_user(&data, (void *)uarg, sizeof(data));
 		if (rv < 0)
 			goto clean;
 		op->dma.addr = data.addr;
 		op->dma.len = data.len;
-		op->dma.mode = PNVL_MODE_OFF;
-		op->ioctl_fn = pnvl_ioctl_recv;
+		op->dma.mode = PSIPE_MODE_OFF;
+		op->ioctl_fn = psipe_ioctl_recv;
 		break;
 	default:
 		goto clean;
@@ -50,9 +52,9 @@ clean:
 	return NULL;
 }
 
-pnvl_handle_t pnvl_ops_init(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
+psipe_handle_t psipe_ops_init(struct psipe_dev *psipe_dev, struct psipe_op *op)
 {
-	struct pnvl_ops *ops = &pnvl_dev->ops;
+	struct psipe_ops *ops = &psipe_dev->ops;
 	unsigned long flags;
 	long rv = 0;
 	int empty;
@@ -60,11 +62,11 @@ pnvl_handle_t pnvl_ops_init(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
 	if (!op)
 		return -EINVAL;
 
-	rv = pnvl_dma_pin_pages(&op->dma);
+	rv = psipe_dma_pin_pages(&op->dma);
 	if (rv < 0)
 		return rv;
 
-	//pr_info("pnvl_dma_pin_pages - success\n");
+	//pr_info("psipe_dma_pin_pages - success\n");
 
 	spin_lock_irqsave(&ops->lock, flags);
 	empty = list_empty(&ops->active); 
@@ -73,8 +75,8 @@ pnvl_handle_t pnvl_ops_init(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
 	spin_unlock_irqrestore(&ops->lock, flags);
 
 	if (empty) {
-		//pr_info("pnvl_ops_init - running op %lu\n", op->id);
-		rv = op->ioctl_fn(pnvl_dev, &op->dma);
+		//pr_info("psipe_ops_init - running op %lu\n", op->id);
+		rv = op->ioctl_fn(psipe_dev, &op->dma);
 		if (rv < 0)
 			return rv;
 	}
@@ -82,26 +84,26 @@ pnvl_handle_t pnvl_ops_init(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
 	return op->id;
 }
 
-struct pnvl_op *pnvl_ops_current(struct pnvl_ops *ops)
+struct psipe_op *psipe_ops_current(struct psipe_ops *ops)
 {
 	/* ops->lock must be taken */
 	return list_empty(&ops->active) ?
-		NULL : list_first_entry(&ops->active, struct pnvl_op, list);
+		NULL : list_first_entry(&ops->active, struct psipe_op, list);
 }
 
-static void pnvl_ops_fini(struct pnvl_dev *pnvl_dev, struct pnvl_op *op)
+static void psipe_ops_fini(struct psipe_dev *psipe_dev, struct psipe_op *op)
 {
-	pnvl_dma_unmap_pages(&op->dma, pnvl_dev->pdev);
-	pnvl_dma_unpin_pages(&op->dma);
+	psipe_dma_unmap_pages(&op->dma, psipe_dev->pdev);
+	psipe_dma_unpin_pages(&op->dma);
 
 	/* ops->lock must be taken */
-	list_move_tail(&op->list, &pnvl_dev->ops.inactive);
+	list_move_tail(&op->list, &psipe_dev->ops.inactive);
 
 	op->flag = 1;
 	wake_up_all(&op->waitq);
 }
 
-long pnvl_ops_wait(struct pnvl_op *op)
+long psipe_ops_wait(struct psipe_op *op)
 {
 	long rv = -EINVAL;
 
@@ -121,31 +123,31 @@ out:
 	return rv;
 }
 
-void pnvl_ops_next(struct pnvl_dev *pnvl_dev)
+void psipe_ops_next(struct psipe_dev *psipe_dev)
 {
-	struct pnvl_ops *ops = &pnvl_dev->ops;
-	struct pnvl_op *op;
+	struct psipe_ops *ops = &psipe_dev->ops;
+	struct psipe_op *op;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ops->lock, flags);
 
-	op = pnvl_ops_current(ops);
+	op = psipe_ops_current(ops);
 	if (!op)
 		goto unlock;
-	pnvl_ops_fini(pnvl_dev, op);
-	op = pnvl_ops_current(ops);
+	psipe_ops_fini(psipe_dev, op);
+	op = psipe_ops_current(ops);
 	if (op) {
-		//pr_info("pnvl_ops_next - running op %lu\n", op->id);
-		op->retval = op->ioctl_fn(pnvl_dev, &op->dma);
+		//pr_info("psipe_ops_next - running op %lu\n", op->id);
+		op->retval = op->ioctl_fn(psipe_dev, &op->dma);
 	}
 
 unlock:
 	spin_unlock_irqrestore(&ops->lock, flags);
 }
 
-struct pnvl_op *pnvl_ops_get(struct pnvl_ops *ops, pnvl_handle_t id)
+struct psipe_op *psipe_ops_get(struct psipe_ops *ops, psipe_handle_t id)
 {
-	struct pnvl_op *cur_op, *op = NULL;
+	struct psipe_op *cur_op, *op = NULL;
 	struct list_head *entry;
 	unsigned long flags;
 
@@ -154,14 +156,14 @@ struct pnvl_op *pnvl_ops_get(struct pnvl_ops *ops, pnvl_handle_t id)
 
 	spin_lock_irqsave(&ops->lock, flags);
 	list_for_each(entry, &ops->active) {
-		cur_op = list_entry(entry, struct pnvl_op, list);
+		cur_op = list_entry(entry, struct psipe_op, list);
 		if (cur_op->id == id) {
 			op = cur_op;
 			goto unlock;
 		}
 	}
 	list_for_each(entry, &ops->inactive) {
-		cur_op = list_entry(entry, struct pnvl_op, list);
+		cur_op = list_entry(entry, struct psipe_op, list);
 		if (cur_op->id == id) {
 			op = cur_op;
 			goto unlock;
@@ -173,24 +175,24 @@ out:
 	return op;
 }
 
-int pnvl_ops_flush(struct pnvl_dev *pnvl_dev)
+int psipe_ops_flush(struct psipe_dev *psipe_dev)
 {
-	struct pnvl_ops *ops = &pnvl_dev->ops;
-	struct pnvl_op *op;
+	struct psipe_ops *ops = &psipe_dev->ops;
+	struct psipe_op *op;
 	struct list_head *entry, *tmp;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ops->lock, flags);
 	list_for_each_safe(entry, tmp, &ops->active) {
 		list_del(entry);
-		op = list_entry(entry, struct pnvl_op, list);
-		pnvl_dma_unpin_pages(&op->dma);
-		pnvl_dma_unmap_pages(&op->dma, pnvl_dev->pdev);
+		op = list_entry(entry, struct psipe_op, list);
+		psipe_dma_unpin_pages(&op->dma);
+		psipe_dma_unmap_pages(&op->dma, psipe_dev->pdev);
 		kfree(op);
 	}
 	list_for_each_safe(entry, tmp, &ops->inactive) {
 		list_del(entry);
-		kfree(list_entry(entry, struct pnvl_op, list));
+		kfree(list_entry(entry, struct psipe_op, list));
 	}
 	spin_unlock_irqrestore(&ops->lock, flags);
 

@@ -1,27 +1,30 @@
 /* irq.h - Interrupt Request operations
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ * Copyright (c) 2023 Luiz Henrique Suraty Filho <luiz-dev@suraty.com> (pciemu)
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
-#ifndef PNVL_IRQ_H
-#define PNVL_IRQ_H
+#ifndef PSIPE_IRQ_H
+#define PSIPE_IRQ_H
 
 #include "qemu/osdep.h"
 #include "hw/pci/pci.h"
 
-#define PNVL_IRQ_MAX_VECS 4
+#define PSIPE_IRQ_MAX_VECS 4
 
 /* Forward declaration */
-typedef struct PNVLDevice PNVLDevice;
+typedef struct PSIPEDevice PSIPEDevice;
 
 typedef struct MSIVector {
-	PNVLDevice *dev;
+	PSIPEDevice *dev;
 	bool raised;
 } MSIVector;
 
 typedef struct IRQStatusMSI {
-	MSIVector msi_vectors[PNVL_IRQ_MAX_VECS];
+	MSIVector msi_vectors[PSIPE_IRQ_MAX_VECS];
 } IRQStatusMSI;
 
 typedef struct IRQStatusPin {
@@ -38,11 +41,11 @@ typedef union IRQStatus {
  * ============================================================================
  */
 
-void pnvl_irq_raise(PNVLDevice *dev, unsigned int vector);
-void pnvl_irq_lower(PNVLDevice *dev, unsigned int vector);
+void psipe_irq_raise(PSIPEDevice *dev, unsigned int vector);
+void psipe_irq_lower(PSIPEDevice *dev, unsigned int vector);
 
-void pnvl_irq_reset(PNVLDevice *dev);
-void pnvl_irq_init(PNVLDevice *dev, Error **errp);
-void pnvl_irq_fini(PNVLDevice *dev);
+void psipe_irq_reset(PSIPEDevice *dev);
+void psipe_irq_init(PSIPEDevice *dev, Error **errp);
+void psipe_irq_fini(PSIPEDevice *dev);
 
-#endif /* PNVL_IRQ_H */
+#endif /* PSIPE_IRQ_H */

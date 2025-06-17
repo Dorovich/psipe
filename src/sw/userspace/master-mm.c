@@ -7,7 +7,7 @@
 #include <malloc.h>
 #include <math.h>
 #include <errno.h>
-#include "pnvl_wrappers.h"
+#include "psipe_wrappers.h"
 #include <signal.h>
 
 static void sighup_handler(int signo)
@@ -17,7 +17,7 @@ static void sighup_handler(int signo)
 
 #define TYPE double
 
-struct pnvl_devices *pnvl_devs;
+struct psipe_devices *psipe_devs;
 
 #define TRUNCATE 1
 #define APPEND 2
@@ -51,20 +51,20 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 {
 	double t0, t1;
 
-	{ /* PNVL PART START =================================== */
-		pnvl_open_devs();
-	} /* PNVL PART END ===================================== */
+	{ /* psipe PART START =================================== */
+		psipe_open_devs();
+	} /* psipe PART END ===================================== */
 
-	printf ("num_devs %d\n", pnvl_num_devs());
+	printf ("num_devs %d\n", psipe_num_devs());
 	t0 = now();
 
-	{ /* PNVL PART START =================================== */
-		int fd, num = pnvl_num_devs();
+	{ /* psipe PART START =================================== */
+		int fd, num = psipe_num_devs();
 		int part, pi, pj, sz_part, ofs = 0;
-		pnvl_handle_t id;
+		psipe_handle_t id;
 
 		for (int i = 0; i < num; ++i) {
-			fd = pnvl_fd(i);
+			fd = psipe_fd(i);
 			part = PART_FOR_DEV(i, sz_n * sz_m, num);
 			sz_part = part * sizeof(TYPE);
 			pi = ofs / sz_m;
@@ -73,76 +73,76 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			printf("dev=%d (fd=%d), part=%d (sz_part=%d), ofs=%d\n",
 					i, fd, part, part, ofs);
 
-			id = pnvl_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
+			id = psipe_send_args(fd, sz_n, sz_t, sz_m, part, ofs);
 			if ((long)id < 0) {
-				perror("pnvl_send_args");
+				perror("psipe_send_args");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			if (pnvl_wait(fd, id) < 0) {
-				perror("pnvl_wait(args)");
+			if (psipe_wait(fd, id) < 0) {
+				perror("psipe_wait(args)");
 				exit(1);
 			}
 #endif
 
-			id = pnvl_send(fd, A, sz_n * sz_t * sizeof(TYPE));
+			id = psipe_send(fd, A, sz_n * sz_t * sizeof(TYPE));
 			if ((long)id < 0) {
-				perror("pnvl_send(A)");
+				perror("psipe_send(A)");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			if (pnvl_wait(fd, id) < 0) {
-				perror("pnvl_wait(A)");
+			if (psipe_wait(fd, id) < 0) {
+				perror("psipe_wait(A)");
 				exit(1);
 			}
 #endif
 
-			id = pnvl_send(fd, B, sz_t * sz_m * sizeof(TYPE));
+			id = psipe_send(fd, B, sz_t * sz_m * sizeof(TYPE));
 			if ((long)id < 0) {
-				perror("pnvl_send(B)");
+				perror("psipe_send(B)");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			if (pnvl_wait(fd, id) < 0) {
-				perror("pnvl_wait(B)");
+			if (psipe_wait(fd, id) < 0) {
+				perror("psipe_wait(B)");
 				exit(1);
 			}
 #endif
 
-			id = pnvl_send(fd, &C[pi][pj], sz_part);
+			id = psipe_send(fd, &C[pi][pj], sz_part);
 			if ((long)id < 0) {
-				perror("pnvl_send(C)");
+				perror("psipe_send(C)");
 				exit(1);
 			}
 #if WAIT_ALL_OPS
-			if (pnvl_wait(fd, id) < 0) {
-				perror("pnvl_wait(C)");
+			if (psipe_wait(fd, id) < 0) {
+				perror("psipe_wait(C)");
 				exit(1);
 			}
 #endif
 
-			id = pnvl_recv(fd, &C[pi][pj], sz_part);
+			id = psipe_recv(fd, &C[pi][pj], sz_part);
 			if ((long)id < 0) {
-				perror("pnvl_recv(C)");
+				perror("psipe_recv(C)");
 				exit(1);
 			}
-			if (pnvl_wait(fd, id) < 0) {
-				perror("pnvl_wait(C)");
+			if (psipe_wait(fd, id) < 0) {
+				perror("psipe_wait(C)");
 				exit(1);
 			}
 
-			pnvl_flush(fd);
+			psipe_flush(fd);
 			ofs += part;
 			printf("matmul - part %d/%d ready\n", i+1, num);
 			fflush(NULL);
 		}
-	} /* PNVL PART END ===================================== */
+	} /* psipe PART END ===================================== */
 
 	t1 = now();
 
-	{ /* PNVL PART START =================================== */
-		pnvl_close_devs();
-	} /* PNVL PART END ===================================== */
+	{ /* psipe PART START =================================== */
+		psipe_close_devs();
+	} /* psipe PART END ===================================== */
 
 	show_time(msg, t0, t1);
 	printf("\nMatrices: ( %d %d ) x ( %d %d ) -> ( %d %d )\n",

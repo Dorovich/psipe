@@ -1,14 +1,17 @@
-/* pnvl_irq.c - pnvl virtual device DMA operations
+/* psipe_irq.c - psipe virtual device DMA operations
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ * Copyright (c) 2023 Luiz Henrique Suraty Filho <luiz-dev@suraty.com> (pciemu)
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
-#include "hw/pnvl_hw.h"
-#include "pnvl_module.h"
+#include "hw/psipe_hw.h"
+#include "psipe_module.h"
 #include <linux/dma-mapping.h>
 
-int pnvl_dma_pin_pages(struct pnvl_dma *dma)
+int psipe_dma_pin_pages(struct psipe_dma *dma)
 {
 	int first_page, last_page, npages, pinned, rv;
 	unsigned ofs;
@@ -19,7 +22,7 @@ int pnvl_dma_pin_pages(struct pnvl_dma *dma)
 	npages = last_page - first_page + 1;
 	dma->npages = npages;
 
-	if (npages <= 0 || npages > PNVL_HW_BAR0_DMA_HANDLES_CNT)
+	if (npages <= 0 || npages > PSIPE_HW_BAR0_DMA_HANDLES_CNT)
 		return -EMSGSIZE;
 
 	dma->pages = kmalloc_array(npages, sizeof(struct page *), GFP_KERNEL);
@@ -78,7 +81,7 @@ free_pages:
 	return rv;
 }
 
-int pnvl_dma_map_pages(struct pnvl_dma *dma, struct pci_dev *pdev)
+int psipe_dma_map_pages(struct psipe_dma *dma, struct pci_dev *pdev)
 {
 	dma->nmapped = dma_map_sg(&pdev->dev, dma->sgt.sgl, dma->sgt.nents,
 			dma->direction);
@@ -86,43 +89,43 @@ int pnvl_dma_map_pages(struct pnvl_dma *dma, struct pci_dev *pdev)
 	return (int)dma->nmapped;
 }
 
-void pnvl_dma_write_setup(struct pnvl_dma *dma, struct pnvl_bar *bar, int mode,
+void psipe_dma_write_setup(struct psipe_dma *dma, struct psipe_bar *bar, int mode,
 		enum dma_data_direction dir)
 {
 	dma->mode = mode;
 	dma->direction = dir;
-	iowrite32((u32)dma->mode, bar->mmio + PNVL_HW_BAR0_DMA_CFG_MOD);
+	iowrite32((u32)dma->mode, bar->mmio + PSIPE_HW_BAR0_DMA_CFG_MOD);
 }
 
-void pnvl_dma_write_maps(struct pnvl_dma *dma, struct pnvl_bar *bar)
+void psipe_dma_write_maps(struct psipe_dma *dma, struct psipe_bar *bar)
 {
 	dma_addr_t handle;
 	struct scatterlist *sg;
 	unsigned ofs = 0;
 	int i;
 
-	iowrite32((u32)dma->len, bar->mmio + PNVL_HW_BAR0_DMA_CFG_LEN);
-	iowrite32((u32)dma->nmapped, bar->mmio + PNVL_HW_BAR0_DMA_CFG_PGS);
+	iowrite32((u32)dma->len, bar->mmio + PSIPE_HW_BAR0_DMA_CFG_LEN);
+	iowrite32((u32)dma->nmapped, bar->mmio + PSIPE_HW_BAR0_DMA_CFG_PGS);
 
 	for_each_sg(dma->sgt.sgl, sg, dma->nmapped, i) {
 		handle = sg_dma_address(sg);
 		iowrite32((u32)handle,
-				bar->mmio + PNVL_HW_BAR0_DMA_HANDLES + ofs);
+				bar->mmio + PSIPE_HW_BAR0_DMA_HANDLES + ofs);
 		ofs += sizeof(u32);
 	}
 }
 
-void pnvl_dma_doorbell_ring(struct pnvl_bar *bar)
+void psipe_dma_doorbell_ring(struct psipe_bar *bar)
 {
-	iowrite32(1, bar->mmio + PNVL_HW_BAR0_DMA_DOORBELL_RING);
+	iowrite32(1, bar->mmio + PSIPE_HW_BAR0_DMA_DOORBELL_RING);
 }
 
-void pnvl_dma_unmap_pages(struct pnvl_dma *dma, struct pci_dev *pdev)
+void psipe_dma_unmap_pages(struct psipe_dma *dma, struct pci_dev *pdev)
 {
 	dma_unmap_sg(&pdev->dev, dma->sgt.sgl, dma->sgt.nents, dma->direction);
 }
 
-void pnvl_dma_unpin_pages(struct pnvl_dma *dma)
+void psipe_dma_unpin_pages(struct psipe_dma *dma)
 {
 	unpin_user_pages(dma->pages, dma->npages);
 	kfree(dma->pages);

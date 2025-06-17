@@ -22,7 +22,7 @@ compile_commands.json
 
 # build folders
 build/
-/src/hw/pnvl_hw.h
+/src/hw/psipe_hw.h
 
 # user programs
 src/sw/userspace/chiplet0

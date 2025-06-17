@@ -1,13 +1,16 @@
 /* dma.c - Direct Memory Access (DMA) operations
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ * Copyright (c) 2023 Luiz Henrique Suraty Filho <luiz-dev@suraty.com> (pciemu)
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
 #include "qemu/osdep.h"
 #include "exec/target_page.h"
 #include "qemu/log.h"
-#include "pnvl.h"
+#include "psipe.h"
 #include "dma.h"
 
 /* ============================================================================
@@ -15,7 +18,7 @@
  * ============================================================================
  */
 
-static inline dma_addr_t pnvl_dma_mask(DMAEngine *dma, dma_addr_t addr)
+static inline dma_addr_t psipe_dma_mask(DMAEngine *dma, dma_addr_t addr)
 {
 	dma_addr_t masked_addr = addr & dma->config.mask;
 	if (masked_addr != addr) {
@@ -26,26 +29,26 @@ static inline dma_addr_t pnvl_dma_mask(DMAEngine *dma, dma_addr_t addr)
 	return masked_addr;
 }
 
-static inline bool pnvl_dma_inside_dev_boundaries(dma_addr_t addr)
+static inline bool psipe_dma_inside_dev_boundaries(dma_addr_t addr)
 {
-	return (PNVL_HW_DMA_AREA_START <= addr &&
-			addr <= PNVL_HW_DMA_AREA_START + PNVL_HW_DMA_AREA_SIZE);
+	return (PSIPE_HW_DMA_AREA_START <= addr &&
+			addr <= PSIPE_HW_DMA_AREA_START + PSIPE_HW_DMA_AREA_SIZE);
 }
 
-static inline void pnvl_dma_init_current(DMAEngine *dma)
+static inline void psipe_dma_init_current(DMAEngine *dma)
 {
 	dma->current.len_left = dma->config.len;
 	dma->current.addr = dma->config.handles[0];
 	dma->current.hnd_pos = 0;
 }
 
-static int pnvl_dma_read(PNVLDevice *dev, dma_addr_t addr, int len, int ofs)
+static int psipe_dma_read(PSIPEDevice *dev, dma_addr_t addr, int len, int ofs)
 {
 	//printf("DMA RD: %d bytes @ %#010lx\n", len, addr);
 	return pci_dma_read(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
 }
 
-static int pnvl_dma_write(PNVLDevice *dev, dma_addr_t addr, int len, int ofs)
+static int psipe_dma_write(PSIPEDevice *dev, dma_addr_t addr, int len, int ofs)
 {
 	//printf("DMA WR: %d bytes @ %#010lx\n", len, addr);
 	return pci_dma_write(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
@@ -60,10 +63,10 @@ static int pnvl_dma_write(PNVLDevice *dev, dma_addr_t addr, int len, int ofs)
 /*
  * Receive page: DMA buffer <-- RAM
  */
-int pnvl_dma_rx_page(PNVLDevice *dev)
+int psipe_dma_rx_page(PSIPEDevice *dev)
 {
 	DMAEngine *dma = &dev->dma;
-	unsigned long mask = pnvl_dma_mask(dma, dma->config.page_size - 1);
+	unsigned long mask = psipe_dma_mask(dma, dma->config.page_size - 1);
 	dma_addr_t addr = dma->current.addr;
 	size_t ofs, len_want, len_have;
 
@@ -72,16 +75,16 @@ int pnvl_dma_rx_page(PNVLDevice *dev)
 	len_want = MIN(dma->config.page_size, dma->current.len_left);
 
 	if (len_want <= len_have) {
-		if (pnvl_dma_read(dev, addr, len_want, 0) < 0)
-			return PNVL_FAILURE;
+		if (psipe_dma_read(dev, addr, len_want, 0) < 0)
+			return PSIPE_FAILURE;
 		addr += len_want;
 	} else {
-		if (pnvl_dma_read(dev, addr, len_have, 0) < 0)
-			return PNVL_FAILURE;
+		if (psipe_dma_read(dev, addr, len_have, 0) < 0)
+			return PSIPE_FAILURE;
 		addr = dma->config.handles[++dma->current.hnd_pos];
 
-		if (pnvl_dma_read(dev, addr, len_want-len_have, len_have) < 0)
-			return PNVL_FAILURE;
+		if (psipe_dma_read(dev, addr, len_want-len_have, len_have) < 0)
+			return PSIPE_FAILURE;
 		addr += len_want - len_have;
 	}
 
@@ -93,93 +96,93 @@ int pnvl_dma_rx_page(PNVLDevice *dev)
 /*
  * Transmit page: DMA buffer --> RAM
  */
-int pnvl_dma_tx_page(PNVLDevice *dev, int len_want)
+int psipe_dma_tx_page(PSIPEDevice *dev, int len_want)
 {
 	DMAEngine *dma = &dev->dma;
-	unsigned long mask = pnvl_dma_mask(dma, dma->config.page_size - 1);
+	unsigned long mask = psipe_dma_mask(dma, dma->config.page_size - 1);
 	dma_addr_t addr = dma->current.addr;
 	size_t ofs, len_have;
 
 	ofs = addr & mask;
 	len_have = dma->config.page_size - ofs;
 
-	if (len_want == PNVL_FAILURE)
-		return PNVL_FAILURE;
+	if (len_want == PSIPE_FAILURE)
+		return PSIPE_FAILURE;
 
 	if (len_want <= len_have) {
-		if (pnvl_dma_write(dev, addr, len_want, 0) < 0)
-			return PNVL_FAILURE;
+		if (psipe_dma_write(dev, addr, len_want, 0) < 0)
+			return PSIPE_FAILURE;
 		addr += len_want;
 	} else {
-		if (pnvl_dma_write(dev, addr, len_have, 0) < 0)
-			return PNVL_FAILURE;
+		if (psipe_dma_write(dev, addr, len_have, 0) < 0)
+			return PSIPE_FAILURE;
 		addr = dma->config.handles[++dma->current.hnd_pos];
 
-		if (pnvl_dma_write(dev, addr, len_want-len_have, len_have) < 0)
-			return PNVL_FAILURE;
+		if (psipe_dma_write(dev, addr, len_want-len_have, len_have) < 0)
+			return PSIPE_FAILURE;
 		addr += len_want - len_have;
 	}
 
 	dma->current.addr = addr;
 	dma->current.len_left -= len_want;
-	return PNVL_SUCCESS;
+	return PSIPE_SUCCESS;
 }
 
-int pnvl_dma_begin_run(PNVLDevice *dev)
+int psipe_dma_begin_run(PSIPEDevice *dev)
 {
 	DMAStatus status;
 
-	pnvl_dma_init_current(&dev->dma);
+	psipe_dma_init_current(&dev->dma);
 	status = qatomic_cmpxchg(&dev->dma.status, DMA_STATUS_IDLE,
 			DMA_STATUS_EXECUTING);
 	if (status == DMA_STATUS_EXECUTING)
-		return PNVL_FAILURE;
+		return PSIPE_FAILURE;
 
-	return PNVL_SUCCESS;
+	return PSIPE_SUCCESS;
 }
 
-void pnvl_dma_end_run(PNVLDevice *dev)
+void psipe_dma_end_run(PSIPEDevice *dev)
 {
 	qatomic_set(&dev->dma.status, DMA_STATUS_IDLE);
 }
 
-void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle)
+void psipe_dma_add_handle(PSIPEDevice *dev, dma_addr_t handle)
 {
 	DMAEngine *dma = &dev->dma;
-	dma_addr_t new_hnd = pnvl_dma_mask(dma, handle);
+	dma_addr_t new_hnd = psipe_dma_mask(dma, handle);
 	dma->config.handles[dma->config.npages++] = new_hnd;
 }
 
-bool pnvl_dma_is_idle(PNVLDevice *dev)
+bool psipe_dma_is_idle(PSIPEDevice *dev)
 {
 	return qatomic_read(&dev->dma.status) == DMA_STATUS_IDLE;
 }
 
-bool pnvl_dma_is_finished(PNVLDevice *dev)
+bool psipe_dma_is_finished(PSIPEDevice *dev)
 {
 	return !dev->dma.current.len_left;
 }
 
-void pnvl_dma_reset(PNVLDevice *dev)
+void psipe_dma_reset(PSIPEDevice *dev)
 {
 	DMAEngine *dma = &dev->dma;
 	dma->status = DMA_STATUS_IDLE;
 	dma->config.npages = 0;
 	dma->config.len = 0;
 	dma->config.page_size = qemu_target_page_size();
-	memset(dma->buff, 0, PNVL_HW_DMA_AREA_SIZE);
+	memset(dma->buff, 0, PSIPE_HW_DMA_AREA_SIZE);
 	memset(dma->config.handles, 0,
-			sizeof(dma_addr_t) * PNVL_HW_BAR0_DMA_HANDLES_CNT);
+			sizeof(dma_addr_t) * PSIPE_HW_BAR0_DMA_HANDLES_CNT);
 }
 
-void pnvl_dma_init(PNVLDevice *dev, Error **errp)
+void psipe_dma_init(PSIPEDevice *dev, Error **errp)
 {
-	pnvl_dma_reset(dev);
-	dev->dma.config.mask = DMA_BIT_MASK(PNVL_HW_DMA_ADDR_CAPABILITY);
+	psipe_dma_reset(dev);
+	dev->dma.config.mask = DMA_BIT_MASK(PSIPE_HW_DMA_ADDR_CAPABILITY);
 }
 
-void pnvl_dma_fini(PNVLDevice *dev)
+void psipe_dma_fini(PSIPEDevice *dev)
 {
-	pnvl_dma_reset(dev);
+	psipe_dma_reset(dev);
 	dev->dma.status = DMA_STATUS_OFF;
 }

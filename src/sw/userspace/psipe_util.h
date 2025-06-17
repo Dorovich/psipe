@@ -1,4 +1,4 @@
-/* pnvl_util.h - Utility functions for userspace programs
+/* psipe_util.h - Utility functions for userspace programs
  *
  * Author: David Cañadas López <dcanadas@bsc.es>
  *
@@ -25,7 +25,7 @@ struct context_multi {
 };
 
 void usage(FILE * fd, char **argv);
-int open_pnvl_dev(struct context *ctx);
+int open_psipe_dev(struct context *ctx);
 struct context parse_args(int argc, char **argv);
 struct context_multi parse_args_multi(int argc, char **argv);
 long int calc_time(struct timeval *t1, struct timeval *t2);

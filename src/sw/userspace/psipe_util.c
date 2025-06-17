@@ -1,10 +1,10 @@
-/* pnvl_util.c - Utility functions for userspace programs
+/* psipe_util.c - Utility functions for userspace programs
  *
  * Author: David Cañadas López <dcanadas@bsc.es>
  *
  */
 
-#include "pnvl_util.h"
+#include "psipe_util.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -63,11 +63,11 @@ long int calc_time(struct timeval *t1, struct timeval *t2)
 	return us2 - us1;
 }
 
-int open_pnvl_dev(struct context *ctx)
+int open_psipe_dev(struct context *ctx)
 {
 	char filename[64];
 
-	snprintf(filename, 64, "/dev/pnvl/d%ub%ud%uf%u_bar0",
+	snprintf(filename, 64, "/dev/psipe/d%ub%ud%uf%u_bar0",
 		ctx->pci_domain_nb, ctx->pci_bus_nb, ctx->pci_device_nb,
 		ctx->pci_func_nb);
 
@@ -90,7 +90,7 @@ struct context parse_args(int argc, char **argv)
 	ctx.pci_domain_nb = 0;
 	ctx.pci_device_nb = PCI_DEVICE_NUMBER_INVALID;
 	ctx.pci_bus_nb = PCI_BUS_NUMBER_INVALID;
-	/* PCI funciton number is always 0 for pnvl */
+	/* PCI funciton number is always 0 for psipe */
 	ctx.pci_func_nb = 0;
 
 	ctx.vec_len = 0;
@@ -247,7 +247,7 @@ struct context_multi parse_args_multi(int argc, char **argv)
 	}
 
 	if (fds_pos != ctx.fds_len) {
-		LOG_ERR("Missing devices. Consult /dev/pnvl/ to "
+		LOG_ERR("Missing devices. Consult /dev/psipe/ to "
 				"find available ones.\n");
 		exit(-1);
 	}

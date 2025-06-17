@@ -1,8 +1,8 @@
-# Makefile for the Proto-NVLink kernel module
+# Makefile for the Proto-SIPE kernel module
 
-obj-m += pnvl.o
-pnvl-objs += pnvl_module.o pnvl_dma.o pnvl_irq.o pnvl_queue.o
-ccflags-y = -I ${HOME}/src/proto-nvlink/include -g -DDEBUG
+obj-m += psipe.o
+psipe-objs += psipe_module.o psipe_dma.o psipe_irq.o psipe_queue.o
+ccflags-y = -I $(PWD)/../../../include -g -DDEBUG
 KDIR := ../../../linux-6.6.72
 ARCH := riscv
 CROSS_COMPILE := riscv64-linux-gnu-

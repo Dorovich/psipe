@@ -7,7 +7,7 @@ kcode="../src/sw/kernel"
 ucode="../src/sw/userspace"
 
 PROGS="
-$kcode/pnvl.ko
+$kcode/psipe.ko
 $ucode/master0
 $ucode/master1
 $ucode/chiplet0

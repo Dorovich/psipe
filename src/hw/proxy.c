@@ -1,13 +1,15 @@
-/* proxy.c - External access to Proto-NVLink memory
+/* proxy.c - External access to Proto-SIPE memory
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
 #include "qemu/osdep.h"
 #include "qemu/log.h"
 #include "proxy.h"
-#include "pnvl.h"
+#include "psipe.h"
 #include "qapi/qapi-commands-machine.h"
 
 /* ============================================================================
@@ -15,9 +17,9 @@
  * ============================================================================
  */
 
-static void pnvl_proxy_init_server(PNVLDevice *dev)
+static void psipe_proxy_init_server(PSIPEDevice *dev)
 {
-	PNVLProxy *proxy = &dev->proxy;
+	PSIPEProxy *proxy = &dev->proxy;
 	socklen_t len = sizeof(proxy->client.addr);
 
 	if (bind(proxy->server.sockd, (struct sockaddr *)&proxy->server.addr,
@@ -26,7 +28,7 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 		return;
 	}
 
-	if (listen(proxy->server.sockd, PNVL_PROXY_MAXQ) < 0) {
+	if (listen(proxy->server.sockd, PSIPE_PROXY_MAXQ) < 0) {
 		perror("listen");
 		return;
 	}
@@ -41,21 +43,21 @@ static void pnvl_proxy_init_server(PNVLDevice *dev)
 	}
 
 	/* Begin connection test */
-	if (pnvl_proxy_issue_req(dev, PNVL_REQ_ACK) != PNVL_SUCCESS) {
-		perror("pnvl_proxy_issue_req");
+	if (psipe_proxy_issue_req(dev, PSIPE_REQ_ACK) != PSIPE_SUCCESS) {
+		perror("psipe_proxy_issue_req");
 		return;
 	}
-	if (pnvl_proxy_await_req(dev, PNVL_REQ_ACK) != PNVL_SUCCESS) {
-		perror("pnvl_proxy_await_req");
+	if (psipe_proxy_await_req(dev, PSIPE_REQ_ACK) != PSIPE_SUCCESS) {
+		perror("psipe_proxy_await_req");
 		return;
 	}
 	puts("Client connection established.");
 	/* End connection test */
 }
 
-static void pnvl_proxy_init_client(PNVLDevice *dev)
+static void psipe_proxy_init_client(PSIPEDevice *dev)
 {
-	PNVLProxy *proxy = &dev->proxy;
+	PSIPEProxy *proxy = &dev->proxy;
 
 	if (connect(proxy->server.sockd, (struct sockaddr *)&proxy->server.addr,
 				sizeof(proxy->server.addr)) < 0) {
@@ -64,28 +66,28 @@ static void pnvl_proxy_init_client(PNVLDevice *dev)
 	}
 
 	/* Begin connection test */
-	if (pnvl_proxy_await_req(dev, PNVL_REQ_ACK) != PNVL_SUCCESS) {
-		perror("pnvl_proxy_await_req");
+	if (psipe_proxy_await_req(dev, PSIPE_REQ_ACK) != PSIPE_SUCCESS) {
+		perror("psipe_proxy_await_req");
 		return;
 	}
-	if (pnvl_proxy_issue_req(dev, PNVL_REQ_ACK) != PNVL_SUCCESS) {
-		perror("pnvl_proxy_issue_req");
+	if (psipe_proxy_issue_req(dev, PSIPE_REQ_ACK) != PSIPE_SUCCESS) {
+		perror("psipe_proxy_issue_req");
 		return;
 	}
 	puts("Server connection established.");
 	/* End connection test */
 }
 
-static inline int pnvl_proxy_endpoint(PNVLDevice *dev)
+static inline int psipe_proxy_endpoint(PSIPEDevice *dev)
 {
 	return (dev->proxy.server_mode ?
 			dev->proxy.client.sockd : dev->proxy.server.sockd);
 }
 
-static ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
+static ProxyRequest psipe_proxy_wait_req(PSIPEDevice *dev)
 {
-	int con = pnvl_proxy_endpoint(dev);
-	ProxyRequest req = PNVL_REQ_NIL;
+	int con = psipe_proxy_endpoint(dev);
+	ProxyRequest req = PSIPE_REQ_NIL;
 	fd_set cons;
 
 	FD_ZERO(&cons);
@@ -96,33 +98,33 @@ static ProxyRequest pnvl_proxy_wait_req(PNVLDevice *dev)
 	return req;
 }
 
-static int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
+static int psipe_proxy_handle_req(PSIPEDevice *dev, ProxyRequest req)
 {
-	int con = pnvl_proxy_endpoint(dev);
+	int con = psipe_proxy_endpoint(dev);
 
 	switch(req) {
-	case PNVL_REQ_SYN:
-		pnvl_execute(dev);
+	case PSIPE_REQ_SYN:
+		psipe_execute(dev);
 		break;
-	case PNVL_REQ_RST:
+	case PSIPE_REQ_RST:
 		qmp_system_reset(NULL); /* see qemu/ui/gtk.c L1313 */
 		break;
-	case PNVL_REQ_SLN:
-		pnvl_proxy_issue_req(dev, PNVL_REQ_RLN);
+	case PSIPE_REQ_SLN:
+		psipe_proxy_issue_req(dev, PSIPE_REQ_RLN);
 		send(con, &dev->dma.config.len_avail,
 				sizeof(dev->dma.config.len_avail), 0);
 		break;
-	case PNVL_REQ_RLN:
+	case PSIPE_REQ_RLN:
 		recv(con, &dev->dma.config.len_avail,
 				sizeof(dev->dma.config.len_avail), 0);
 		break;
-	case PNVL_REQ_ACK:
+	case PSIPE_REQ_ACK:
 		break;
 	default:
-		return PNVL_FAILURE;
+		return PSIPE_FAILURE;
 	}
 
-	return PNVL_SUCCESS;
+	return PSIPE_SUCCESS;
 }
 
 /* ============================================================================
@@ -130,46 +132,46 @@ static int pnvl_proxy_handle_req(PNVLDevice *dev, ProxyRequest req)
  * ============================================================================
  */
 
-int pnvl_proxy_issue_req(PNVLDevice *dev, ProxyRequest req)
+int psipe_proxy_issue_req(PSIPEDevice *dev, ProxyRequest req)
 {
-	int ret, con = pnvl_proxy_endpoint(dev);
+	int ret, con = psipe_proxy_endpoint(dev);
 
 	ret = send(con, &req, sizeof(req), 0);
 	if (ret < 0)
-		return PNVL_FAILURE;
+		return PSIPE_FAILURE;
 
-	return PNVL_SUCCESS;
+	return PSIPE_SUCCESS;
 }
 
-int pnvl_proxy_wait_and_handle_req(PNVLDevice *dev)
+int psipe_proxy_wait_and_handle_req(PSIPEDevice *dev)
 {
-	return pnvl_proxy_handle_req(dev, pnvl_proxy_wait_req(dev));
+	return psipe_proxy_handle_req(dev, psipe_proxy_wait_req(dev));
 }
 
-int pnvl_proxy_await_req(PNVLDevice *dev, ProxyRequest req)
+int psipe_proxy_await_req(PSIPEDevice *dev, ProxyRequest req)
 {
 	ProxyRequest new_req;
 
 	do {
-		new_req = pnvl_proxy_wait_req(dev);
-	} while(new_req != PNVL_FAILURE && new_req != req);
+		new_req = psipe_proxy_wait_req(dev);
+	} while(new_req != PSIPE_FAILURE && new_req != req);
 
-	return pnvl_proxy_handle_req(dev, new_req);
+	return psipe_proxy_handle_req(dev, new_req);
 }
 
 /*
  * Receive page: buffer <-- socket
  */
-int pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
+int psipe_proxy_rx_page(PSIPEDevice *dev, uint8_t *buff)
 {
-	int src = pnvl_proxy_endpoint(dev);
+	int src = psipe_proxy_endpoint(dev);
 	int len = 0;
 
 	if (recv(src, &len, sizeof(len), 0) < 0 || !len)
-		return PNVL_FAILURE;
+		return PSIPE_FAILURE;
 
 	if (recv(src, buff, len, 0) < 0)
-		return PNVL_FAILURE;
+		return PSIPE_FAILURE;
 
 	return len;
 }
@@ -177,45 +179,45 @@ int pnvl_proxy_rx_page(PNVLDevice *dev, uint8_t *buff)
 /*
  * Transmit page: buffer --> socket
  */
-int pnvl_proxy_tx_page(PNVLDevice *dev, uint8_t *buff, int len)
+int psipe_proxy_tx_page(PSIPEDevice *dev, uint8_t *buff, int len)
 {
-	int dst = pnvl_proxy_endpoint(dev);
+	int dst = psipe_proxy_endpoint(dev);
 
 	if (len <= 0)
-		return PNVL_FAILURE;
+		return PSIPE_FAILURE;
 
 	if (send(dst, &len, sizeof(len), 0) < 0)
-		return PNVL_FAILURE;
+		return PSIPE_FAILURE;
 
 	if (send(dst, buff, len, 0) < 0)
-		return PNVL_FAILURE;
+		return PSIPE_FAILURE;
 
-	return PNVL_SUCCESS;
+	return PSIPE_SUCCESS;
 }
 
-bool pnvl_proxy_get_mode(Object *obj, Error **errp)
+bool psipe_proxy_get_mode(Object *obj, Error **errp)
 {
-	PNVLDevice *dev = PNVL(obj);
+	PSIPEDevice *dev = PSIPE(obj);
 	return dev->proxy.server_mode;
 }
 
-void pnvl_proxy_set_mode(Object *obj, bool mode, Error **errp)
+void psipe_proxy_set_mode(Object *obj, bool mode, Error **errp)
 {
-	PNVLDevice *dev = PNVL(obj);
+	PSIPEDevice *dev = PSIPE(obj);
 	dev->proxy.server_mode = mode;
 }
 
-void pnvl_proxy_reset(PNVLDevice *dev)
+void psipe_proxy_reset(PSIPEDevice *dev)
 {
 	return;
 }
 
-void pnvl_proxy_init(PNVLDevice *dev, Error **errp)
+void psipe_proxy_init(PSIPEDevice *dev, Error **errp)
 {
-	PNVLProxy *proxy = &dev->proxy;
+	PSIPEProxy *proxy = &dev->proxy;
 	struct hostent *h;
 
-	h = gethostbyname(PNVL_PROXY_HOST);
+	h = gethostbyname(PSIPE_PROXY_HOST);
 	if (!h) {
 		herror("gethostbyname");
 		return;
@@ -233,12 +235,12 @@ void pnvl_proxy_init(PNVLDevice *dev, Error **errp)
 	proxy->server.addr.sin_addr.s_addr = *(in_addr_t *)h->h_addr_list[0];
 
 	if (proxy->server_mode)
-		pnvl_proxy_init_server(dev);
+		psipe_proxy_init_server(dev);
 	else
-		pnvl_proxy_init_client(dev);
+		psipe_proxy_init_client(dev);
 }
 
-void pnvl_proxy_fini(PNVLDevice *dev)
+void psipe_proxy_fini(PSIPEDevice *dev)
 {
 	if (dev->proxy.server_mode)
 		close(dev->proxy.client.sockd);

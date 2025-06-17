@@ -1,20 +1,23 @@
 /* dma.h - Direct Memory Access (DMA) operations
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ * Copyright (c) 2023 Luiz Henrique Suraty Filho <luiz-dev@suraty.com> (pciemu)
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
-#ifndef PNVL_DMA_H
-#define PNVL_DMA_H
+#ifndef PSIPE_DMA_H
+#define PSIPE_DMA_H
 
 #include "qemu/osdep.h"
 #include "hw/pci/pci.h"
-#include "pnvl_hw.h"
+#include "psipe_hw.h"
 
 #define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : ((1ULL << (n)) - 1))
 
 /* forward declaration */
-typedef struct PNVLDevice PNVLDevice;
+typedef struct PSIPEDevice PSIPEDevice;
 
 typedef dma_addr_t dma_size_t;
 typedef uint64_t dma_mask_t;
@@ -25,7 +28,7 @@ typedef struct DMAConfig {
 	dma_size_t len_avail;
 	dma_mask_t mask;
 	size_t page_size;
-	dma_addr_t handles[PNVL_HW_BAR0_DMA_HANDLES_CNT];
+	dma_addr_t handles[PSIPE_HW_BAR0_DMA_HANDLES_CNT];
 } DMAConfig;
 
 typedef struct DMACurrent {
@@ -50,7 +53,7 @@ typedef struct DMAEngine {
 	DMACurrent current;
 	DMAStatus status;
 	DMAMode mode;
-	uint8_t buff[PNVL_HW_DMA_AREA_SIZE];
+	uint8_t buff[PSIPE_HW_DMA_AREA_SIZE];
 } DMAEngine;
 
 /* ============================================================================
@@ -58,17 +61,17 @@ typedef struct DMAEngine {
  * ============================================================================
  */
 
-int pnvl_dma_rx_page(PNVLDevice *dev);
-int pnvl_dma_tx_page(PNVLDevice *dev, int len_want);
+int psipe_dma_rx_page(PSIPEDevice *dev);
+int psipe_dma_tx_page(PSIPEDevice *dev, int len_want);
 
-int pnvl_dma_begin_run(PNVLDevice *dev);
-void pnvl_dma_end_run(PNVLDevice *dev);
-void pnvl_dma_add_handle(PNVLDevice *dev, dma_addr_t handle);
-bool pnvl_dma_is_idle(PNVLDevice *dev);
-bool pnvl_dma_is_finished(PNVLDevice *dev);
+int psipe_dma_begin_run(PSIPEDevice *dev);
+void psipe_dma_end_run(PSIPEDevice *dev);
+void psipe_dma_add_handle(PSIPEDevice *dev, dma_addr_t handle);
+bool psipe_dma_is_idle(PSIPEDevice *dev);
+bool psipe_dma_is_finished(PSIPEDevice *dev);
 
-void pnvl_dma_reset(PNVLDevice *dev);
-void pnvl_dma_init(PNVLDevice *dev, Error **errp);
-void pnvl_dma_fini(PNVLDevice *dev);
+void psipe_dma_reset(PSIPEDevice *dev);
+void psipe_dma_init(PSIPEDevice *dev, Error **errp);
+void psipe_dma_fini(PSIPEDevice *dev);
 
-#endif /* PNVL_DMA_H */
+#endif /* PSIPE_DMA_H */

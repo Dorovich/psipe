@@ -1,26 +1,29 @@
 /* mmio.h - Memory Mapped IO operations
  *
- * Author: David Cañadas López <dcanadas@bsc.es>
+ * Copyright (c) 2025 David Cañadas López <david.canadas@estudiantat.upc.edu>
+ * Copyright (c) 2023 Luiz Henrique Suraty Filho <luiz-dev@suraty.com> (pciemu)
+ *
+ * SPDX-Liscense-Identifier: GPL-2.0
  *
  */
 
-#ifndef PNVL_MMIO_H
-#define PNVL_MMIO_H
+#ifndef PSIPE_MMIO_H
+#define PSIPE_MMIO_H
 
-#include "pnvl.h"
+#include "psipe.h"
 
 /* forward declaration */
-typedef struct PNVLDevice PNVLDevice;
+typedef struct PSIPEDevice PSIPEDevice;
 
 /* ============================================================================
  * Public
  * ============================================================================
  */
 
-void pnvl_mmio_reset(PNVLDevice *dev);
-void pnvl_mmio_init(PNVLDevice *dev, Error **errp);
-void pnvl_mmio_fini(PNVLDevice *dev);
+void psipe_mmio_reset(PSIPEDevice *dev);
+void psipe_mmio_init(PSIPEDevice *dev, Error **errp);
+void psipe_mmio_fini(PSIPEDevice *dev);
 
-extern const MemoryRegionOps pnvl_mmio_ops;
+extern const MemoryRegionOps psipe_mmio_ops;
 
-#endif /* PNVL_MMIO_H */
+#endif /* PSIPE_MMIO_H */
