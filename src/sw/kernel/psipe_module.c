@@ -16,9 +16,9 @@
 #include <linux/string.h>
 
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0");
+MODULE_VERSION("2.0");
 MODULE_DESCRIPTION("Kernel module to control the psipe virtual device");
-MODULE_AUTHOR("David Cañadas López <dcanadas@bsc.es>");
+MODULE_AUTHOR("David Cañadas López <david.canadas@estudiantat.upc.edu>");
 
 static struct class *psipe_class;
 
