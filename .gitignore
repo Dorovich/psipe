@@ -31,6 +31,8 @@ src/sw/userspace/chiplet1
 src/sw/userspace/master1
 src/sw/userspace/master-mm
 src/sw/userspace/chiplet-mm
+src/sw/userspace/mm*
+vm/test-*.sh
 
 # kernel module
 *.symvers

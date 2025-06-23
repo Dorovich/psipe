@@ -40,6 +40,11 @@ static inline void psipe_irq_lower_intx(PSIPEDevice *dev)
 	pci_set_irq(&dev->pci_dev, 0);
 }
 
+static inline int psipe_irq_check_intx(PSIPEDevice *dev)
+{
+	return (int)dev->irq.pin.raised;
+}
+
 static inline void psipe_irq_raise_msi(PSIPEDevice *dev, unsigned int vector)
 {
 	MSIVector *vec;
@@ -64,6 +69,17 @@ static inline void psipe_irq_lower_msi(PSIPEDevice *dev, unsigned int vector)
 		vec->raised = false;
 }
 
+static inline int psipe_irq_check_msi(PSIPEDevice *dev, unsigned int vector)
+{
+	MSIVector *vec;
+
+	if (vector >= PSIPE_IRQ_MAX_VECS)
+		return 0;
+
+	vec = &dev->irq.msi.msi_vectors[vector];
+	return (int)vec->raised;
+}
+
 /* ============================================================================
  * Public
  * ============================================================================
@@ -83,6 +99,15 @@ void psipe_irq_lower(PSIPEDevice *dev, unsigned int vector)
 		psipe_irq_lower_msi(dev, vector);
 	else
 		psipe_irq_lower_intx(dev);
+}
+
+int psipe_irq_check(PSIPEDevice *dev, unsigned int vector)
+{
+	if (msi_enabled(&dev->pci_dev))
+		return psipe_irq_check_msi(dev, vector);
+	else
+		return psipe_irq_check_intx(dev);
+	return -1;
 }
 
 void psipe_irq_reset(PSIPEDevice *dev)

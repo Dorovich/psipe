@@ -48,7 +48,7 @@ int psipe_dma_pin_pages(struct psipe_dma *dma)
 	pinned = pin_user_pages_fast(dma->addr, npages,
 			FOLL_LONGTERM | FOLL_WRITE, dma->pages);
 	if (pinned == -EFAULT || pinned == -EAGAIN) { /* we can retry */
-		//pr_info("pin_user_pages - recoverable error, retrying\n");
+		pr_info("pin_user_pages - recoverable error, retrying\n");
 		down_read(&current->mm->mmap_lock);
 		pinned = pin_user_pages(dma->addr, npages,
 				FOLL_LONGTERM | FOLL_WRITE, dma->pages);
@@ -56,11 +56,11 @@ int psipe_dma_pin_pages(struct psipe_dma *dma)
 	}
 
 	if (pinned < 0) {
-		//pr_info("pin_user_pages - error\n");
+		pr_info("pin_user_pages - error\n");
 		rv = pinned;
 		goto free_pages;
 	} else if (pinned != npages) {
-		//pr_info("pin_user_pages - too short (%d/%d)\n", pinned, npages);
+		pr_info("pin_user_pages - too short (%d/%d)\n", pinned, npages);
 		rv = -EFAULT;
 		goto unpin_pages;
 	}

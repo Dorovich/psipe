@@ -75,7 +75,7 @@ done
 ../qemu/build/qemu-system-riscv64 \
 	-machine virt \
 	-cpu rv64 \
-	-m 2G \
+	-m 1G \
 	-smp 1 \
 	-drive file=$disk,format=raw,if=none,id=hd0,read-only=$ronly,file.locking=$lock \
 	-device virtio-blk-device,drive=hd0 \

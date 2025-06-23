@@ -14,6 +14,11 @@ $ucode/chiplet0
 $ucode/chiplet1
 $ucode/master-mm
 $ucode/chiplet-mm
+$ucode/mm20
+$ucode/mm50
+$ucode/mm100
+$ucode/mm200
+$ucode/mm500
 "
 
 # Can run all in sequence with "-iur"

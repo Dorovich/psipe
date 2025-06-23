@@ -51,6 +51,10 @@ static uint64_t psipe_mmio_read(void *opaque, hwaddr addr, unsigned int size)
 		goto mmio_read_end;
 
 	switch(addr) {
+	case PSIPE_HW_BAR0_IRQ_0_RAISE:
+	case PSIPE_HW_BAR0_IRQ_0_LOWER:
+		val = psipe_irq_check(dev, 0);
+		break;
 	case PSIPE_HW_BAR0_DMA_CFG_LEN:
 		val = dev->dma.config.len;
 		break;

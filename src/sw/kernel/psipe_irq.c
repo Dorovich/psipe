@@ -11,22 +11,42 @@
 #include "psipe_module.h"
 #include <linux/pci.h>
 
+static inline bool psipe_irq_check_and_ack(struct psipe_dev *psipe_dev)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&psipe_dev->irq.lock, flags);
+	bool active = (bool)ioread32(psipe_dev->irq.mmio_check_irq);
+	if (active)
+		iowrite32(1, psipe_dev->irq.mmio_ack_irq);
+	spin_unlock_irqrestore(&psipe_dev->irq.lock, flags);
+
+	return active;
+}
+
+/*
 static inline void psipe_irq_ack(struct psipe_dev *psipe_dev)
 {
 	iowrite32(1, psipe_dev->irq.mmio_ack_irq);
 }
+*/
 
 static irqreturn_t psipe_irq_handler(int irq, void *data)
 {
 	struct psipe_dev *psipe_dev = data;
 
-	psipe_irq_ack(psipe_dev);
+	if (!psipe_irq_check_and_ack(psipe_dev))
+		return IRQ_NONE;
+
+	//psipe_irq_ack(psipe_dev);
 	psipe_ops_next(psipe_dev);
 
 	/*
 	dev_dbg(&psipe_dev->pdev->dev, "irq_handler irq = %d dev = %d\n", irq,
 		psipe_dev->major);
 	*/
+
+	pr_info("irq handled (%d)\n", psipe_dev->major);
 
 	return IRQ_HANDLED;
 }
@@ -54,12 +74,21 @@ static int psipe_irq_enable_vectors(struct psipe_dev *psipe_dev)
 		goto err_clean_irqs;
 	}
 
+	/*
+	dev_info(&psipe_dev->pdev->dev, "Probing device at %02x:%02x.%x with irq %d\n",
+			pci_domain_nr(psipe_dev->pdev->bus),
+			psipe_dev->pdev->devfn >> 3,
+			psipe_dev->pdev->devfn & 0x7,
+			psipe_dev->irq.irq_num);
+	*/
+
 	err = request_irq(psipe_dev->irq.irq_num, psipe_irq_handler,
-			  PSIPE_HW_IRQ_WORK_ENDED_VECTOR,
-			  "psipe_irq_dma_ended", psipe_dev);
+			  IRQF_SHARED, "psipe_dma_fini", psipe_dev);
 	if (err)
 		goto err_clean_irqs;
 
+	psipe_dev->irq.mmio_check_irq =
+		psipe_dev->bar.mmio + PSIPE_HW_IRQ_WORK_ENDED_ADDR;
 	psipe_dev->irq.mmio_ack_irq =
 		psipe_dev->bar.mmio + PSIPE_HW_IRQ_WORK_ENDED_ACK_ADDR;
 	return 0;

@@ -21,9 +21,16 @@ struct psipe_devices *psipe_devs;
 
 #define TRUNCATE 1
 #define APPEND 2
+
+#define _SIZE_X 500
+#define SIZE_N _SIZE_X
+#define SIZE_T _SIZE_X
+#define SIZE_M _SIZE_X
+/*
 #define SIZE_N 80 //64
 #define SIZE_T 90 //100
 #define SIZE_M 80 //64
+*/
 
 double now();
 void show_time(char *msg, double t0, double t1);

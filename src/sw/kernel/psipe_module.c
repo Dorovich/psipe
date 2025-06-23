@@ -71,12 +71,12 @@ long psipe_ioctl_send(struct psipe_dev *psipe_dev, struct psipe_dma *dma)
 		return rv;
 	}
 
-	//pr_info("psipe_dma_map_pages - success\n");
+	pr_info("psipe_dma_map_pages - success\n");
 
 	psipe_dma_write_maps(dma, bar);
 	psipe_dma_doorbell_ring(bar);
 
-	//pr_info("psipe_ioctl_send - success\n");
+	pr_info("psipe_ioctl_send - success\n");
 
 	return (long)rv;
 }
@@ -95,12 +95,12 @@ long psipe_ioctl_recv(struct psipe_dev *psipe_dev, struct psipe_dma *dma)
 		return rv;
 	}
 
-	//pr_info("psipe_dma_map_pages - success\n");
+	pr_info("psipe_dma_map_pages - success\n");
 
 	psipe_dma_write_maps(dma, bar);
 	psipe_dma_doorbell_ring(bar);
 
-	//pr_info("psipe_ioctl_recv - success\n");
+	pr_info("psipe_ioctl_recv - success\n");
 
 	return (long)rv;
 }
@@ -164,6 +164,7 @@ static int psipe_dev_init(struct psipe_dev *psipe_dev, struct pci_dev *pdev)
 	}
 	pci_set_drvdata(pdev, psipe_dev);
 
+	spin_lock_init(&psipe_dev->irq.lock);
 	spin_lock_init(&psipe_dev->ops.lock);
 	INIT_LIST_HEAD(&psipe_dev->ops.active);
 	INIT_LIST_HEAD(&psipe_dev->ops.inactive);

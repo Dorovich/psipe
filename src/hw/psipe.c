@@ -120,7 +120,7 @@ static void psipe_transfer_pages(PSIPEDevice *dev)
 		return;
 
 	do {
-		//printf("%lu bytes left\n", dev->dma.current.len_left);
+		printf("%lu bytes left\n", dev->dma.current.len_left);
 		len = psipe_dma_rx_page(dev);
 		ret = psipe_proxy_tx_page(dev, dev->dma.buff, len);
 	} while (ret != PSIPE_FAILURE && !psipe_dma_is_finished(dev));
@@ -138,7 +138,7 @@ static void psipe_receive_pages(PSIPEDevice *dev)
 		return;
 
 	do {
-		//printf("%lu bytes left\n", dev->dma.current.len_left);
+		printf("%lu bytes left\n", dev->dma.current.len_left);
 		len = psipe_proxy_rx_page(dev, dev->dma.buff);
 		ret = psipe_dma_tx_page(dev, len);
 	} while (ret != PSIPE_FAILURE && !psipe_dma_is_finished(dev));

@@ -23,8 +23,6 @@
 #define PSIPE_MODE_PASSIVE 0
 #define PSIPE_MODE_OFF -1
 
-//struct psipe_dev; /* forward declaration */
-
 struct psipe_bar {
 	u64 start;
 	u64 end;
@@ -34,7 +32,9 @@ struct psipe_bar {
 
 struct psipe_irq {
 	void __iomem *mmio_ack_irq;
+	void __iomem *mmio_check_irq;
 	int irq_num;
+	spinlock_t lock;
 };
 
 struct psipe_dma {

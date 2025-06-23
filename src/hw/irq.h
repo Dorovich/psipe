@@ -43,6 +43,7 @@ typedef union IRQStatus {
 
 void psipe_irq_raise(PSIPEDevice *dev, unsigned int vector);
 void psipe_irq_lower(PSIPEDevice *dev, unsigned int vector);
+int psipe_irq_check(PSIPEDevice *dev, unsigned int vector);
 
 void psipe_irq_reset(PSIPEDevice *dev);
 void psipe_irq_init(PSIPEDevice *dev, Error **errp);
