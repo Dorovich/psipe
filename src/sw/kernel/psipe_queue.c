@@ -66,7 +66,7 @@ psipe_handle_t psipe_ops_init(struct psipe_dev *psipe_dev, struct psipe_op *op)
 	if (rv < 0)
 		return rv;
 
-	pr_info("psipe_dma_pin_pages - success\n");
+	//pr_info("psipe_dma_pin_pages - success\n");
 
 	spin_lock_irqsave(&ops->lock, flags);
 	empty = list_empty(&ops->active); 
@@ -75,7 +75,7 @@ psipe_handle_t psipe_ops_init(struct psipe_dev *psipe_dev, struct psipe_op *op)
 	spin_unlock_irqrestore(&ops->lock, flags);
 
 	if (empty) {
-		pr_info("psipe_ops_init - running op %lu\n", op->id);
+		//pr_info("psipe_ops_init - running op %lu\n", op->id);
 		rv = op->ioctl_fn(psipe_dev, &op->dma);
 		if (rv < 0)
 			return rv;
@@ -137,7 +137,7 @@ void psipe_ops_next(struct psipe_dev *psipe_dev)
 	psipe_ops_fini(psipe_dev, op);
 	op = psipe_ops_current(ops);
 	if (op) {
-		pr_info("psipe_ops_next - running op %lu\n", op->id);
+		//pr_info("psipe_ops_next - running op %lu\n", op->id);
 		op->retval = op->ioctl_fn(psipe_dev, &op->dma);
 	}
 

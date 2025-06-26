@@ -38,7 +38,6 @@ static irqreturn_t psipe_irq_handler(int irq, void *data)
 	if (!psipe_irq_check_and_ack(psipe_dev))
 		return IRQ_NONE;
 
-	//psipe_irq_ack(psipe_dev);
 	psipe_ops_next(psipe_dev);
 
 	/*
@@ -46,7 +45,7 @@ static irqreturn_t psipe_irq_handler(int irq, void *data)
 		psipe_dev->major);
 	*/
 
-	pr_info("irq handled (%d)\n", psipe_dev->major);
+	//pr_info("irq handled (%d)\n", psipe_dev->major);
 
 	return IRQ_HANDLED;
 }
@@ -75,7 +74,8 @@ static int psipe_irq_enable_vectors(struct psipe_dev *psipe_dev)
 	}
 
 	/*
-	dev_info(&psipe_dev->pdev->dev, "Probing device at %02x:%02x.%x with irq %d\n",
+	dev_info(&psipe_dev->pdev->dev,
+			"Probing device at %02x:%02x.%x with irq %d\n",
 			pci_domain_nr(psipe_dev->pdev->bus),
 			psipe_dev->pdev->devfn >> 3,
 			psipe_dev->pdev->devfn & 0x7,

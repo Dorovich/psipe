@@ -29,7 +29,8 @@ int psipe_dma_pin_pages(struct psipe_dma *dma)
 	if (!dma->pages)
 		return -ENOMEM;
 
-	/* BEGIN VMA CHECK */
+#if DEBUG_CHECK_VMA
+#pragma message("Compiling with VMA checks.")
 	struct vm_area_struct *vma;
 
 	down_read(&current->mm->mmap_lock);
@@ -43,12 +44,12 @@ int psipe_dma_pin_pages(struct psipe_dma *dma)
 		pr_err("Address 0x%lx is not writable", dma->addr);
 		return -EFAULT;
 	}
-	/* END VMA CHECK */
+#endif /* DEBUG_CHECK_VMA */
 
 	pinned = pin_user_pages_fast(dma->addr, npages,
 			FOLL_LONGTERM | FOLL_WRITE, dma->pages);
 	if (pinned == -EFAULT || pinned == -EAGAIN) { /* we can retry */
-		pr_info("pin_user_pages - recoverable error, retrying\n");
+		//pr_info("pin_user_pages - recoverable error, retrying\n");
 		down_read(&current->mm->mmap_lock);
 		pinned = pin_user_pages(dma->addr, npages,
 				FOLL_LONGTERM | FOLL_WRITE, dma->pages);
@@ -56,11 +57,11 @@ int psipe_dma_pin_pages(struct psipe_dma *dma)
 	}
 
 	if (pinned < 0) {
-		pr_info("pin_user_pages - error\n");
+		//pr_info("pin_user_pages - error\n");
 		rv = pinned;
 		goto free_pages;
 	} else if (pinned != npages) {
-		pr_info("pin_user_pages - too short (%d/%d)\n", pinned, npages);
+		//pr_info("pin_user_pages - too short (%d/%d)\n", pinned, npages);
 		rv = -EFAULT;
 		goto unpin_pages;
 	}

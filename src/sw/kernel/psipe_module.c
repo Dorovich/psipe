@@ -71,12 +71,12 @@ long psipe_ioctl_send(struct psipe_dev *psipe_dev, struct psipe_dma *dma)
 		return rv;
 	}
 
-	pr_info("psipe_dma_map_pages - success\n");
+	//pr_info("psipe_dma_map_pages - success\n");
 
 	psipe_dma_write_maps(dma, bar);
 	psipe_dma_doorbell_ring(bar);
 
-	pr_info("psipe_ioctl_send - success\n");
+	//pr_info("psipe_ioctl_send - success\n");
 
 	return (long)rv;
 }
@@ -95,12 +95,12 @@ long psipe_ioctl_recv(struct psipe_dev *psipe_dev, struct psipe_dma *dma)
 		return rv;
 	}
 
-	pr_info("psipe_dma_map_pages - success\n");
+	//pr_info("psipe_dma_map_pages - success\n");
 
 	psipe_dma_write_maps(dma, bar);
 	psipe_dma_doorbell_ring(bar);
 
-	pr_info("psipe_ioctl_recv - success\n");
+	//pr_info("psipe_ioctl_recv - success\n");
 
 	return (long)rv;
 }
@@ -272,7 +272,7 @@ static int psipe_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_irq_enable;
 	}
 
-	dev_info(&pdev->dev, "psipe probe - success\n");
+	//dev_info(&pdev->dev, "psipe probe - success\n");
 
 	return 0;
 
@@ -327,7 +327,7 @@ static void psipe_remove(struct pci_dev *pdev)
 
 	kfree(psipe_dev);
 
-	dev_info(&pdev->dev, "psipe remove - success\n");
+	//dev_info(&pdev->dev, "psipe remove - success\n");
 }
 
 static struct pci_driver psipe_pci_driver = {
@@ -341,7 +341,7 @@ static void psipe_module_exit(void)
 {
 	pci_unregister_driver(&psipe_pci_driver);
 	class_destroy(psipe_class);
-	pr_debug("psipe_module_exit finished successfully\n");
+	//pr_debug("psipe_module_exit finished successfully\n");
 }
 
 static char *psipe_devnode(const struct device *dev, umode_t *mode)
@@ -366,7 +366,7 @@ static int __init psipe_module_init(void)
 		pr_err("pci_register_driver error\n");
 		goto err_pci;
 	}
-	pr_debug("psipe_module_init finished successfully\n");
+	//pr_debug("psipe_module_init finished successfully\n");
 	return 0;
 err_pci:
 	class_destroy(psipe_class);

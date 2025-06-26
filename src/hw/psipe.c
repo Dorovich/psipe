@@ -115,36 +115,38 @@ static void psipe_transfer_pages(PSIPEDevice *dev)
 {
 	int ret, len;
 
-	printf("(TX) beginning - %lu\n", dev->dma.config.len);
+	//printf("(TX) beginning - %lu\n", dev->dma.config.len);
 	if (psipe_dma_begin_run(dev) < 0)
 		return;
 
 	do {
-		printf("%lu bytes left\n", dev->dma.current.len_left);
+		printf("TX:\t%lu / %lu bytes left\n", dev->dma.current.len_left,
+				dev->dma.config.len);
 		len = psipe_dma_rx_page(dev);
 		ret = psipe_proxy_tx_page(dev, dev->dma.buff, len);
 	} while (ret != PSIPE_FAILURE && !psipe_dma_is_finished(dev));
 
 	psipe_dma_end_run(dev);
-	printf("(TX) finished - %d\n", ret);
+	//printf("(TX) finished - %d\n", ret);
 }
 
 static void psipe_receive_pages(PSIPEDevice *dev)
 {
 	int ret, len;
 
-	printf("(RX) beginning - %lu\n", dev->dma.config.len);
+	//printf("(RX) beginning - %lu\n", dev->dma.config.len);
 	if (psipe_dma_begin_run(dev) < 0)
 		return;
 
 	do {
-		printf("%lu bytes left\n", dev->dma.current.len_left);
+		printf("RX:\t%lu / %lu bytes left\n", dev->dma.current.len_left,
+				dev->dma.config.len);
 		len = psipe_proxy_rx_page(dev, dev->dma.buff);
 		ret = psipe_dma_tx_page(dev, len);
 	} while (ret != PSIPE_FAILURE && !psipe_dma_is_finished(dev));
 
 	psipe_dma_end_run(dev);
-	printf("(RX) finished - %d\n", ret);
+	//printf("(RX) finished - %d\n", ret);
 }
 
 /* ============================================================================

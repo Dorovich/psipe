@@ -10,6 +10,8 @@
 #ifndef _PSIPE_MODULE_H_
 #define _PSIPE_MODULE_H_
 
+#define DEBUG_CHECK_VMA 0
+
 #include "hw/psipe_hw.h"
 #include "sw/module/psipe_ioctl.h"
 #include <linux/cdev.h>

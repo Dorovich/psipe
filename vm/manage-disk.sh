@@ -18,7 +18,9 @@ $ucode/mm20
 $ucode/mm50
 $ucode/mm100
 $ucode/mm200
+$ucode/mm200nw
 $ucode/mm500
+$ucode/mm500nw
 "
 
 # Can run all in sequence with "-iur"
