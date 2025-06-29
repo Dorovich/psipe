@@ -183,7 +183,7 @@ int psipe_proxy_tx_page(PSIPEDevice *dev, uint8_t *buff, int len)
 {
 	int dst = psipe_proxy_endpoint(dev);
 
-	if (len <= 0)
+	if (!len || len <= 0)
 		return PSIPE_FAILURE;
 
 	if (send(dst, &len, sizeof(len), 0) < 0)

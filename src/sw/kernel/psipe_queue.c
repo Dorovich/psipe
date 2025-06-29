@@ -184,15 +184,24 @@ int psipe_ops_flush(struct psipe_dev *psipe_dev)
 
 	spin_lock_irqsave(&ops->lock, flags);
 	list_for_each_safe(entry, tmp, &ops->active) {
-		list_del(entry);
 		op = list_entry(entry, struct psipe_op, list);
-		psipe_dma_unpin_pages(&op->dma);
-		psipe_dma_unmap_pages(&op->dma, psipe_dev->pdev);
-		kfree(op);
+		if (!atomic_read(&op->nwaiting)) {
+			psipe_dma_unpin_pages(&op->dma);
+			psipe_dma_unmap_pages(&op->dma, psipe_dev->pdev);
+			list_del(entry);
+			kfree(op);
+		} else {
+			pr_warn("psipe: op %lu still has waiters, skipping\n", op->id);
+		}
 	}
 	list_for_each_safe(entry, tmp, &ops->inactive) {
-		list_del(entry);
-		kfree(list_entry(entry, struct psipe_op, list));
+		op = list_entry(entry, struct psipe_op, list);
+		if (!atomic_read(&op->nwaiting)) {
+			list_del(entry);
+			kfree(op);
+		} else {
+			pr_warn("psipe: op %lu still has waiters, skipping\n", op->id);
+		}
 	}
 	spin_unlock_irqrestore(&ops->lock, flags);
 

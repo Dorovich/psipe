@@ -72,11 +72,11 @@ for i in $(seq 1 $instances); do
 done
 
 #qemu-system-riscv64 \
-../qemu/build/qemu-system-riscv64 \
+exec ../qemu/build/qemu-system-riscv64 \
 	-machine virt \
 	-cpu rv64 \
 	-m 1G \
-	-smp 1 \
+	-smp 2 \
 	-drive file=$disk,format=raw,if=none,id=hd0,read-only=$ronly,file.locking=$lock \
 	-device virtio-blk-device,drive=hd0 \
 	-kernel ../linux-6.6.72/arch/riscv/boot/Image \

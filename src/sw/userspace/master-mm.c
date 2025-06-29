@@ -22,7 +22,7 @@ struct psipe_devices *psipe_devs;
 #define TRUNCATE 1
 #define APPEND 2
 
-#define _SIZE_X 500
+#define _SIZE_X 50
 #define SIZE_N _SIZE_X
 #define SIZE_T _SIZE_X
 #define SIZE_M _SIZE_X
@@ -68,6 +68,7 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 	{ /* psipe PART START =================================== */
 		int fd, num = psipe_num_devs();
 		int part, pi, pj, sz_part, ofs = 0;
+		int last[num];
 		psipe_handle_t id;
 
 		for (int i = 0; i < num; ++i) {
@@ -128,6 +129,12 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			}
 #endif
 
+			last[i] = psipe_recv(fd, &C[pi][pj], sz_part);
+			if ((long)last[i] < 0) {
+				perror("psipe_recv(C)");
+				exit(1);
+			}
+			/*
 			id = psipe_recv(fd, &C[pi][pj], sz_part);
 			if ((long)id < 0) {
 				perror("psipe_recv(C)");
@@ -139,9 +146,22 @@ void matmul(char *msg, int sz_n, int sz_t, int sz_m,
 			}
 
 			psipe_flush(fd);
+			*/
 			ofs += part;
+			/*
 			printf("matmul - part %d/%d ready\n", i+1, num);
 			fflush(NULL);
+			*/
+		}
+		for (int i = 0; i < num; ++i) {
+			id = last[i];
+			fd = psipe_fd(i);
+			if (psipe_wait(fd, id) < 0) {
+				perror("psipe_wait(C)");
+				exit(1);
+			}
+			psipe_flush(fd);
+			printf("matmul - part %d/%d ready\n", i+1, num);
 		}
 	} /* psipe PART END ===================================== */
 

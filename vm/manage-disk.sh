@@ -8,19 +8,17 @@ ucode="../src/sw/userspace"
 
 PROGS="
 $kcode/psipe.ko
-$ucode/master0
-$ucode/master1
-$ucode/chiplet0
-$ucode/chiplet1
 $ucode/master-mm
 $ucode/chiplet-mm
-$ucode/mm20
-$ucode/mm50
-$ucode/mm100
-$ucode/mm200
-$ucode/mm200nw
-$ucode/mm500
-$ucode/mm500nw
+$ucode/mm20nwpl
+$ucode/mm50nwpl
+$ucode/mm100nwpl
+$ucode/mm150nwpl
+$ucode/mm200nwpl
+$ucode/mm250nwpl
+$ucode/mm300nwpl
+$ucode/mm350nwpl
+$ucode/mm400nwpl
 "
 
 # Can run all in sequence with "-iur"

@@ -29,11 +29,13 @@ static inline dma_addr_t psipe_dma_mask(DMAEngine *dma, dma_addr_t addr)
 	return masked_addr;
 }
 
+/*
 static inline bool psipe_dma_inside_dev_boundaries(dma_addr_t addr)
 {
 	return (PSIPE_HW_DMA_AREA_START <= addr &&
 			addr <= PSIPE_HW_DMA_AREA_START + PSIPE_HW_DMA_AREA_SIZE);
 }
+*/
 
 static inline void psipe_dma_init_current(DMAEngine *dma)
 {
@@ -44,14 +46,23 @@ static inline void psipe_dma_init_current(DMAEngine *dma)
 
 static int psipe_dma_read(PSIPEDevice *dev, dma_addr_t addr, int len, int ofs)
 {
-	//printf("DMA RD: %d bytes @ %#010lx\n", len, addr);
-	return pci_dma_read(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
+	return ofs + len > PSIPE_HW_DMA_AREA_SIZE ? -1 : 
+		pci_dma_read(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
 }
 
 static int psipe_dma_write(PSIPEDevice *dev, dma_addr_t addr, int len, int ofs)
 {
-	//printf("DMA WR: %d bytes @ %#010lx\n", len, addr);
-	return pci_dma_write(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
+	return ofs + len > PSIPE_HW_DMA_AREA_SIZE ? -1 : 
+		pci_dma_write(&dev->pci_dev, addr, dev->dma.buff + ofs, len);
+}
+
+static inline dma_addr_t psipe_dma_next_addr(DMAEngine *dma)
+{
+	if (dma->current.hnd_pos < dma->config.npages)
+		++dma->current.hnd_pos;
+	else
+		return 0;
+	return dma->config.handles[dma->current.hnd_pos];
 }
 
 
@@ -81,7 +92,9 @@ int psipe_dma_rx_page(PSIPEDevice *dev)
 	} else {
 		if (psipe_dma_read(dev, addr, len_have, 0) < 0)
 			return PSIPE_FAILURE;
-		addr = dma->config.handles[++dma->current.hnd_pos];
+		addr = psipe_dma_next_addr(dma);
+		if (!addr)
+			return PSIPE_FAILURE;
 
 		if (psipe_dma_read(dev, addr, len_want-len_have, len_have) < 0)
 			return PSIPE_FAILURE;
@@ -106,7 +119,7 @@ int psipe_dma_tx_page(PSIPEDevice *dev, int len_want)
 	ofs = addr & mask;
 	len_have = dma->config.page_size - ofs;
 
-	if (len_want == PSIPE_FAILURE)
+	if (!len_want || len_want == PSIPE_FAILURE)
 		return PSIPE_FAILURE;
 
 	if (len_want <= len_have) {
@@ -116,7 +129,9 @@ int psipe_dma_tx_page(PSIPEDevice *dev, int len_want)
 	} else {
 		if (psipe_dma_write(dev, addr, len_have, 0) < 0)
 			return PSIPE_FAILURE;
-		addr = dma->config.handles[++dma->current.hnd_pos];
+		addr = psipe_dma_next_addr(dma);
+		if (!addr)
+			return PSIPE_FAILURE;
 
 		if (psipe_dma_write(dev, addr, len_want-len_have, len_have) < 0)
 			return PSIPE_FAILURE;
